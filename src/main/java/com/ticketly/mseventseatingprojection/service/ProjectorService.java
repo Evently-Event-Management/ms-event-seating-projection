@@ -45,7 +45,7 @@ public class ProjectorService {
         log.info("Projecting session update for event ID: {} and session ID: {}", eventId, sessionId);
         return eventProjectionClient.getSessionProjectionData(sessionId)
                 .map(eventProjectionMapper::fromSession) // clear intent: projection session mapping
-                .flatMap(sessionInfo -> eventRepository.updateSessionInEvent(eventId.toString(), sessionInfo))
+                .flatMap(sessionInfo -> eventRepository.updateSessionInEvent(eventId.toString(), sessionId.toString(), sessionInfo))
                 .then();
     }
 
