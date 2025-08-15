@@ -3,12 +3,8 @@ package com.ticketly.mseventseatingprojection.consumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketly.mseventseatingprojection.dto.*;
-import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
-import com.ticketly.mseventseatingprojection.model.OrganizationDocument;
-import com.ticketly.mseventseatingprojection.repository.CategoryRepository;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
-import com.ticketly.mseventseatingprojection.repository.OrganizationRepository;
 import com.ticketly.mseventseatingprojection.service.ProjectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,9 +24,6 @@ public class DebeziumEventConsumer {
     private final ProjectorService projectorService;
     private final EventRepository eventReadRepository;
     private final ObjectMapper objectMapper;
-    private final OrganizationRepository organizationRepository;
-    private final EventRepository eventRepository;
-    private final CategoryRepository categoryRepository;
 
     // ✅ A single listener for all Debezium topics
     @KafkaListener(topics = {
@@ -116,27 +109,14 @@ public class DebeziumEventConsumer {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
-        if ("d".equals(operation)) { // Handle delete
+        if ("d".equals(operation)) {
             String orgId = message.path("before").path("id").asText();
-            organizationRepository.deleteById(orgId).subscribe();
-            // You might also want to delete or anonymize events under this org
+            projectorService.deleteOrganization(orgId).subscribe();
             return;
         }
 
         OrganizationChangePayload orgChange = objectMapper.treeToValue(message.path("after"), OrganizationChangePayload.class);
-
-        // 1. Upsert the document in the 'organizations' collection
-        OrganizationDocument orgDoc = OrganizationDocument.builder()
-                .id(orgChange.getId().toString()).name(orgChange.getName())
-                .logoUrl(orgChange.getLogoUrl()).website(orgChange.getWebsite()).build();
-        organizationRepository.save(orgDoc).subscribe();
-
-        // 2. Trigger a bulk update for all events that embed this organization's info
-        EventDocument.OrganizationInfo embeddedInfo = EventDocument.OrganizationInfo.builder()
-                .id(orgChange.getId().toString()).name(orgChange.getName()).logoUrl(orgChange.getLogoUrl()).build();
-        eventRepository.updateOrganizationInfoInEvents(orgChange.getId().toString(), embeddedInfo).subscribe(count ->
-                log.info("Updated embedded organization info for {} events.", count)
-        );
+        projectorService.projectOrganizationChange(orgChange).subscribe();
     }
 
     private void processCategoryChange(String payload) throws Exception {
@@ -145,42 +125,11 @@ public class DebeziumEventConsumer {
 
         if ("d".equals(operation)) {
             String catId = message.path("before").path("id").asText();
-            categoryRepository.deleteById(catId).subscribe();
-            // In a real system, you might trigger a process to re-categorize events
+            projectorService.deleteCategory(catId).subscribe();
             return;
         }
 
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
-
-        // We need the parent category's name for our denormalized document
-        Mono<CategoryDocument> parentCategoryMono = catChange.getParentId() != null
-                ? categoryRepository.findById(catChange.getParentId().toString())
-                : Mono.empty();
-
-        parentCategoryMono.defaultIfEmpty(CategoryDocument.builder().build()) // Handle case where parent is null
-                .flatMap(parentCat -> {
-                    CategoryDocument catDoc = CategoryDocument.builder()
-                            .id(catChange.getId().toString())
-                            .name(catChange.getName())
-                            .parentName(parentCat.getName()) // This will be null if no parent
-                            .build();
-
-                    // 1. Upsert the document in the 'categories' collection
-                    return categoryRepository.save(catDoc)
-                            .doOnSuccess(savedDoc -> log.info("Upserted category document with ID: {}", savedDoc.getId()))
-                            .then(Mono.just(catDoc)); // Pass the document down the chain
-                })
-                .flatMap(catDoc -> {
-                    // 2. Trigger a bulk update for all events that embed this category's info
-                    EventDocument.CategoryInfo embeddedInfo = EventDocument.CategoryInfo.builder()
-                            .id(catDoc.getId())
-                            .name(catDoc.getName())
-                            .parentName(catDoc.getParentName())
-                            .build();
-                    return eventRepository.updateCategoryInfoInEvents(catDoc.getId(), embeddedInfo);
-                })
-                .subscribe(count ->
-                        log.info("Updated embedded category info for {} events.", count)
-                );
+        projectorService.projectCategoryChange(catChange).subscribe();
     }
 }
