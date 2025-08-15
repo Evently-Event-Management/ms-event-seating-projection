@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.dto;
 
+import com.ticketly.mseventseatingprojection.model.SeatStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -45,7 +46,7 @@ public class SessionSeatingMapDTO {
         private String id;
         private String label;
         private String tierId;
-        private String status;
+        private SeatStatus status;
     }
 
     @Data

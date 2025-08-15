@@ -130,7 +130,7 @@ public class EventDocument {
     public static class SeatInfo {
         private String id;
         private String label;
-        private String status;
+        private SeatStatus status;
         private TierInfo tier; // The full, embedded tier details
     }
 
