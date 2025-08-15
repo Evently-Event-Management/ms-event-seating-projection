@@ -1,6 +1,6 @@
 name: CI - Build and Push Docker Image
 
-# Trigger the workflow on a push event to the 'main' branch
+# Trigger workflow on push to main
 on:
   push:
     branches:
@@ -8,27 +8,31 @@ on:
 
 jobs:
   build-and-push:
-    # Run the job on the latest version of Ubuntu
     runs-on: ubuntu-latest
 
+    # Set environment variables for cleaner references
+    env:
+      DOCKER_USER: ${{ vars.DOCKERHUB_USERNAME }}    # Organization variable
+      DOCKER_PASS: ${{ secrets.DOCKERHUB_TOKEN }}    # Organization secret
+      IMAGE_NAME: projection-service
+      IMAGE_TAG: latest
+
     steps:
-      # Step 1: Check out the repository code
+      # Step 1: Checkout code
       - name: Check out repository
         uses: actions/checkout@v4
 
       # Step 2: Log in to Docker Hub
-      # This uses the encrypted secrets you stored in your GitHub repository settings.
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ env.DOCKER_PASS }}
 
-      # Step 3: Build the Docker image and push it to Docker Hub
+      # Step 3: Build and push Docker image
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: . # Use the Dockerfile in the root of the repository
-          push: true   # Actually push the image to the registry
-          # Replace 'your-dockerhub-username' with your actual Docker Hub username
-          tags: your-dockerhub-username/projection-service:latest
+          context: .
+          push: true
+          tags: ${{ env.DOCKER_USER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
