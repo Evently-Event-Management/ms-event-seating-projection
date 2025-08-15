@@ -87,7 +87,7 @@ public class EventDocument {
     @Builder
     public static class GeoJsonPoint {
         private final String type = "Point";
-        private double[] coordinates = new double[2]; // [longitude, latitude]
+        private double[] coordinates; // [longitude, latitude]
     }
 
     // ✅ NEW: Nested classes for the denormalized seating map

@@ -29,7 +29,7 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
      * @param sessionInfo The complete, updated SessionInfo object.
      * @return A Mono emitting the number of documents modified (should be 1).
      */
-    @Query("{ '_id': ?0, 'sessions.id': ?1.id }")
+    @Query("{ '_id': ?0, 'sessions.id': ?1 }")
     Mono<Long> updateSessionInEvent(String eventId, EventDocument.SessionInfo sessionInfo);
 
     /**

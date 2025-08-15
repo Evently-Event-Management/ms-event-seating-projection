@@ -3,7 +3,6 @@ package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionSeatingMapDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.EventProjectionDTO;
-import com.ticketly.mseventseatingprojection.dto.projection.SeatingMapProjectionDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.SessionProjectionDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.TierInfo;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
