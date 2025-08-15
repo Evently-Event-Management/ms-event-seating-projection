@@ -11,7 +11,7 @@ import java.util.UUID;
 public class OrganizationChangePayload {
     private UUID id;
     private String name;
-    @JsonProperty("logourl") // Match the snake_case from the database
+    @JsonProperty("logo_url") // Use snake_case for JSON property names
     private String logoUrl;
     private String website;
 }
