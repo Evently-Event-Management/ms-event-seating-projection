@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -64,12 +64,11 @@ public class EventDocument {
     @Builder
     public static class SessionInfo {
         private String id;
-        private OffsetDateTime startTime;
-        private OffsetDateTime endTime;
+        private Instant startTime;
+        private Instant endTime;
         private String status;
         private String sessionType;
         private VenueDetailsInfo venueDetails;
-        // ✅ ADDED: The complete, denormalized seating map for this session
         private SessionSeatingMapInfo layoutData;
     }
 

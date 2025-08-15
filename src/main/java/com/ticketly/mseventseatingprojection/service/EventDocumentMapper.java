@@ -3,6 +3,7 @@ package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionSeatingMapDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.EventProjectionDTO;
+import com.ticketly.mseventseatingprojection.dto.projection.SeatingMapProjectionDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.SessionProjectionDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.TierInfo;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
@@ -36,11 +37,69 @@ public class EventDocumentMapper {
         if (dto == null) return null;
         return EventDocument.SessionInfo.builder()
                 .id(dto.getId().toString())
-                .startTime(dto.getStartTime())
-                .endTime(dto.getEndTime())
+                .startTime(dto.getStartTime().toInstant())
+                .endTime(dto.getEndTime().toInstant())
                 .status(dto.getStatus())
                 .sessionType(dto.getSessionType().name())
+                .layoutData(toSeatingMapInfo(dto.getLayoutData()))
                 .venueDetails(toVenueDetailsInfo(dto.getVenueDetails()))
+                .build();
+    }
+
+    private EventDocument.SessionSeatingMapInfo toSeatingMapInfo(SeatingMapProjectionDTO dto) {
+        if (dto == null) return null;
+        return EventDocument.SessionSeatingMapInfo.builder()
+                .name(dto.getName())
+                .layout(toLayoutInfo(dto.getLayout()))
+                .build();
+    }
+
+    private EventDocument.LayoutInfo toLayoutInfo(SeatingMapProjectionDTO.LayoutInfo dto) {
+        if (dto == null) return null;
+        return EventDocument.LayoutInfo.builder()
+                .blocks(dto.getBlocks().stream().map(this::toBlockInfo).collect(Collectors.toList()))
+                .build();
+    }
+
+    private EventDocument.BlockInfo toBlockInfo(SeatingMapProjectionDTO.BlockInfo dto) {
+        if (dto == null) return null;
+        return EventDocument.BlockInfo.builder()
+                .id(dto.getId())
+                .name(dto.getName())
+                .type(dto.getType())
+                .position(toPositionInfo(dto.getPosition()))
+                .rows(dto.getRows() != null ? dto.getRows().stream().map(this::toRowInfo).collect(Collectors.toList()) : null)
+                .seats(dto.getSeats() != null ? dto.getSeats().stream().map(this::toSeatInfo).collect(Collectors.toList()) : null)
+                .capacity(dto.getCapacity())
+                .width(dto.getWidth())
+                .height(dto.getHeight())
+                .build();
+    }
+
+    private EventDocument.PositionInfo toPositionInfo(SeatingMapProjectionDTO.PositionInfo dto) {
+        if (dto == null) return null;
+        return EventDocument.PositionInfo.builder()
+                .x(dto.getX())
+                .y(dto.getY())
+                .build();
+    }
+
+    private EventDocument.RowInfo toRowInfo(SeatingMapProjectionDTO.RowInfo dto) {
+        if (dto == null) return null;
+        return EventDocument.RowInfo.builder()
+                .id(dto.getId())
+                .label(dto.getLabel())
+                .seats(dto.getSeats().stream().map(this::toSeatInfo).collect(Collectors.toList()))
+                .build();
+    }
+
+    private EventDocument.SeatInfo toSeatInfo(SeatingMapProjectionDTO.SeatInfo dto) {
+        if (dto == null) return null;
+        return EventDocument.SeatInfo.builder()
+                .id(dto.getId())
+                .label(dto.getLabel())
+                .status(dto.getStatus())
+                .tier(toTierInfo(dto.getTier())) // Embed the full tier info
                 .build();
     }
 

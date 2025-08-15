@@ -11,6 +11,8 @@ import com.ticketly.mseventseatingprojection.service.ProjectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -25,72 +27,78 @@ public class DebeziumEventConsumer {
     private final EventRepository eventReadRepository;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "dbz.ticketly.public.events")
-    public void onEventChange(String payload) {
+    // ✅ A single listener for all Debezium topics
+    @KafkaListener(topics = {
+            "dbz.ticketly.public.events",
+            "dbz.ticketly.public.event_sessions",
+            "dbz.ticketly.public.session_seating_maps"
+            // Add other topics like organizations, categories here
+    })
+    public void onDebeziumEvent(String payload, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+        log.debug("Received message on topic: {}", topic);
         try {
-            JsonNode message = objectMapper.readTree(payload).path("payload");
-            if (message.path("op").asText().equals("d")) { // Handle delete
-                projectorService.deleteEvent(UUID.fromString(message.path("before").path("id").asText())).subscribe();
-                return;
-            }
-
-            EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
-            if ("APPROVED".equals(eventChange.getStatus())) {
-                projectorService.projectFullEvent(eventChange.getId()).subscribe();
-            } else {
-                projectorService.deleteEvent(eventChange.getId()).subscribe();
+            // Use the topic name to decide which logic to execute
+            if (topic.endsWith(".events")) {
+                processEventChange(payload);
+            } else if (topic.endsWith(".event_sessions")) {
+                processSessionChange(payload);
+            } else if (topic.endsWith(".session_seating_maps")) {
+                processSeatingMapChange(payload);
             }
         } catch (Exception e) {
-            log.error("Error processing event change", e);
+            log.error("Error processing Debezium event from topic {}: {}", topic, payload, e);
         }
     }
 
-    @KafkaListener(topics = "dbz.ticketly.public.event_sessions")
-    public void onSessionChange(String payload) {
-        try {
-            JsonNode message = objectMapper.readTree(payload).path("payload");
-            if (message.path("op").asText().equals("d")) return; // Deletes are handled by event cascade
+    private void processEventChange(String payload) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        String operation = message.path("op").asText();
 
-            SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
+        if ("d".equals(operation)) {
+            UUID eventId = UUID.fromString(message.path("before").path("id").asText());
+            projectorService.deleteEvent(eventId).subscribe();
+            return;
+        }
 
-            // Only project the session if the parent event already exists in the read model
-            eventReadRepository.existsById(sessionChange.getEventId().toString())
-                    .filter(exists -> exists)
-                    .flatMap(exists -> projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId()))
-                    .subscribe();
-        } catch (Exception e) {
-            log.error("Error processing session change", e);
+        EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
+        if ("APPROVED".equals(eventChange.getStatus())) {
+            projectorService.projectFullEvent(eventChange.getId()).subscribe();
+        } else {
+            projectorService.deleteEvent(eventChange.getId()).subscribe();
         }
     }
 
-    @KafkaListener(topics = "dbz.ticketly.public.session_seating_maps")
-    public void onSeatingMapChange(String payload) {
-        try {
-            JsonNode message = objectMapper.readTree(payload).path("payload");
-            if (message.path("op").asText().equals("d")) return;
+    private void processSessionChange(String payload) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        String operation = message.path("op").asText();
+        if ("d".equals(operation)) return;
 
-            SeatingMapChangePayload mapChange = objectMapper.treeToValue(message.path("after"), SeatingMapChangePayload.class);
+        SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
+        eventReadRepository.existsById(sessionChange.getEventId().toString())
+                .filter(exists -> exists)
+                .flatMap(exists -> projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId()))
+                .subscribe();
+    }
 
-            // Find the parent event for this session
-            eventReadRepository.findEventIdBySessionId(mapChange.getSessionId().toString())
-                    .flatMap(eventDocument -> {
-                        // Check the session status to decide on the update strategy
-                        EventDocument.SessionInfo session = eventDocument.getSessions().stream()
-                                .filter(s -> s.getId().equals(mapChange.getSessionId().toString()))
-                                .findFirst().orElse(null);
+    private void processSeatingMapChange(String payload) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        String operation = message.path("op").asText();
+        if ("c".equals(operation) || "d".equals(operation)) return;
 
-                        if (session == null) return Mono.empty();
+        SeatingMapChangePayload mapChange = objectMapper.treeToValue(message.path("after"), SeatingMapChangePayload.class);
+        eventReadRepository.findEventBySessionId(mapChange.getSessionId().toString())
+                .flatMap(eventDocument -> {
+                    EventDocument.SessionInfo session = eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(mapChange.getSessionId().toString()))
+                            .findFirst().orElse(null);
 
-                        if ("ON_SALE".equals(session.getStatus())) {
-                            // High-frequency update: use the efficient "read-side join"
-                            return projectorService.projectSeatingMapPatch(UUID.fromString(eventDocument.getId()), mapChange.getSessionId(), mapChange.getLayoutData());
-                        } else {
-                            // Low-frequency update (organizer change): use the "signal and fetch" pattern
-                            return projectorService.projectSessionUpdate(UUID.fromString(eventDocument.getId()), mapChange.getSessionId());
-                        }
-                    }).subscribe();
-        } catch (Exception e) {
-            log.error("Error processing seating map change", e);
-        }
+                    if (session == null) return Mono.empty();
+
+                    if ("ON_SALE".equals(session.getStatus())) {
+                        return projectorService.projectSeatingMapPatch(UUID.fromString(eventDocument.getId()), mapChange.getSessionId(), mapChange.getLayoutData());
+                    } else {
+                        return projectorService.projectSessionUpdate(UUID.fromString(eventDocument.getId()), mapChange.getSessionId());
+                    }
+                }).subscribe();
     }
 }
