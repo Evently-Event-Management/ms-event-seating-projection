@@ -1,22 +1,22 @@
-server:
-  port: 8082
-
 spring:
   application:
     name: projection-service
 
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/mydatabase}
+      uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating}
 
   kafka:
     consumer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-      group-id: ${KAFKA_GROUP_ID:projection-service-group}
+      group-id: ${KAFKA_GROUP_ID:projection-service-group-v10}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       # We will deserialize the value as a simple String
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  #      properties:
+  #        spring.json.trusted.packages: '*'
+  #        spring.json.value.default.type: com.ticketly.mseventseatingprojection.dto.SeatStatusUpdateEvent
 
   security:
     oauth2:
@@ -28,7 +28,20 @@ spring:
           # This client is used for M2M communication
           keycloak-m2m-client:
             provider: keycloak
-            client-id: query-service-client
+            client-id: ${EVENT_PROJECTION_CLIENT_ID:event-projection-service-client}
             client-secret: ${EVENT_PROJECTION_CLIENT_SECRET}
             authorization-grant-type: client_credentials
             scope: internal-api
+
+aws:
+  s3:
+    # For local development with LocalStack
+    #    local-endpoint: ${AWS_S3_LOCAL_ENDPOINT:http://localhost:4566}
+    bucket-name: ${AWS_S3_BUCKET_NAME:event-seating-uploads}
+    # For production, this would be your CloudFront or S3 static website hosting URL
+    public-base-url: ${AWS_S3_PUBLIC_URL:http://s3.localhost.localstack.cloud:4566}
+
+
+services:
+  event-command:
+    base-url: ${COMMAND_SERVICE_URL:http://localhost:8081/api/event-seating}

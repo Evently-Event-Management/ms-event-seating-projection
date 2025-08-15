@@ -8,22 +8,22 @@ import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
 @Builder
-@Document(collection = "events") // This maps the class to the "events" collection in MongoDB
+@Document(collection = "events")
 public class EventDocument {
 
     @Id
-    private String id; // The event UUID from PostgreSQL will be the _id here
+    private String id;
 
-    @TextIndexed // Enable full-text search on the title
+    @TextIndexed
     private String title;
     private String status;
 
-    @TextIndexed // Also enable search on the description
+    @TextIndexed
     private String description;
     private String overview;
     private List<String> coverPhotos;
@@ -64,11 +64,12 @@ public class EventDocument {
     @Builder
     public static class SessionInfo {
         private String id;
-        private OffsetDateTime startTime;
-        private OffsetDateTime endTime;
+        private Instant startTime;
+        private Instant endTime;
         private String status;
         private String sessionType;
         private VenueDetailsInfo venueDetails;
+        private SessionSeatingMapInfo layoutData;
     }
 
     @Data
@@ -77,17 +78,66 @@ public class EventDocument {
         private String name;
         private String address;
         private String onlineLink;
-
-        // For geospatial queries ("events near me")
         @GeoSpatialIndexed
         private GeoJsonPoint location;
     }
 
-    // Standard GeoJSON point structure for MongoDB
     @Data
     @Builder
     public static class GeoJsonPoint {
         private final String type = "Point";
-        private double[] coordinates = new double[2]; // [longitude, latitude]
+        private double[] coordinates; // [longitude, latitude]
+    }
+
+    // ✅ NEW: Nested classes for the denormalized seating map
+    @Data
+    @Builder
+    public static class SessionSeatingMapInfo {
+        private String name;
+        private LayoutInfo layout;
+    }
+
+    @Data
+    @Builder
+    public static class LayoutInfo {
+        private List<BlockInfo> blocks;
+    }
+
+    @Data
+    @Builder
+    public static class BlockInfo {
+        private String id;
+        private String name;
+        private String type;
+        private PositionInfo position;
+        private List<RowInfo> rows;
+        private List<SeatInfo> seats; // For standing capacity blocks
+        private Integer capacity;
+        private Integer width;
+        private Integer height;
+    }
+
+    @Data
+    @Builder
+    public static class RowInfo {
+        private String id;
+        private String label;
+        private List<SeatInfo> seats;
+    }
+
+    @Data
+    @Builder
+    public static class SeatInfo {
+        private String id;
+        private String label;
+        private String status;
+        private TierInfo tier; // The full, embedded tier details
+    }
+
+    @Data
+    @Builder
+    public static class PositionInfo {
+        private Double x;
+        private Double y;
     }
 }
