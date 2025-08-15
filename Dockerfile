@@ -23,4 +23,4 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 
 # Set the command to run the application when the container starts
-ENTRYPOINT ["java","-jar","/app.jar"]
+ENTRYPOINT ["java","-jar","/app/app.jar"]
