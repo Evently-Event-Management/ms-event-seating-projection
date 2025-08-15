@@ -1,0 +1,34 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: projection-service
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/mydatabase}
+
+  kafka:
+    consumer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      group-id: ${KAFKA_GROUP_ID:projection-service-group}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # We will deserialize the value as a simple String
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/event-ticketing}
+        registration:
+          # This client is used for M2M communication
+          keycloak-m2m-client:
+            provider: keycloak
+            client-id: query-service-client
+            client-secret: ${EVENT_PROJECTION_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            scope: internal-api
