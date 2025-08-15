@@ -150,4 +150,21 @@ public class ProjectorService {
         // In a real system, you might trigger a process to re-categorize events
         return categoryRepository.deleteById(catId);
     }
+
+
+    public Mono<Void> projectCoverPhotoAdded(UUID eventId, String photoKey) {
+        log.info("Projecting cover photo addition for event ID: {}", eventId);
+        // Transform the S3 key into a full, public URL
+        String publicUrl = s3UrlGenerator.generatePublicUrl(photoKey);
+        return eventRepository.addCoverPhotoToEvent(eventId.toString(), publicUrl).then();
+    }
+
+    /**
+     * Handles removing a cover photo from an event document.
+     */
+    public Mono<Void> projectCoverPhotoRemoved(UUID eventId, String photoKey) {
+        log.info("Projecting cover photo removal for event ID: {}", eventId);
+        String publicUrl = s3UrlGenerator.generatePublicUrl(photoKey);
+        return eventRepository.removeCoverPhotoFromEvent(eventId.toString(), publicUrl).then();
+    }
 }

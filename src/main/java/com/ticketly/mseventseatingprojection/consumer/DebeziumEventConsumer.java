@@ -8,9 +8,8 @@ import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.service.ProjectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -31,10 +30,18 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.event_sessions",
             "dbz.ticketly.public.session_seating_maps",
             "dbz.ticketly.public.organizations",
-            "dbz.ticketly.public.categories"
+            "dbz.ticketly.public.categories",
+            "dbz.ticketly.public.event_cover_photos"
     })
-    public void onDebeziumEvent(String payload, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+    public void onDebeziumEvent(ConsumerRecord<String, String> record) {
+        String topic = record.topic();
+        String payload = record.value();
+
         log.debug("Received message on topic: {}", topic);
+        if (payload == null || payload.isBlank()) {
+            log.debug("Received tombstone record on topic {}. Ignoring.", topic);
+            return;
+        }
         try {
             // Use the topic name to decide which logic to execute
             if (topic.endsWith(".events")) {
@@ -47,6 +54,10 @@ public class DebeziumEventConsumer {
                 processOrganizationChange(payload);
             } else if (topic.endsWith(".categories")) {
                 processCategoryChange(payload);
+            } else if (topic.endsWith(".event_cover_photos")) {
+                processCoverPhotoChange(payload);
+            } else {
+                log.warn("Unhandled topic: {}", topic);
             }
         } catch (Exception e) {
             log.error("Error processing Debezium event from topic {}: {}", topic, payload, e);
@@ -131,5 +142,33 @@ public class DebeziumEventConsumer {
 
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
         projectorService.projectCategoryChange(catChange).subscribe();
+    }
+
+    private void processCoverPhotoChange(String payload) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        String operation = message.path("op").asText();
+
+        if ("u".equals(operation)) return; // Ignore updates, not relevant for this table
+
+        // Determine which part of the payload to use based on the operation
+        JsonNode dataNode = "d".equals(operation) ? message.path("before") : message.path("after");
+        if (dataNode.isMissingNode()) return;
+
+        CoverPhotoChangePayload photoChange = objectMapper.treeToValue(dataNode, CoverPhotoChangePayload.class);
+
+        // ✅ CRITICAL: Only process the change if the parent event already exists in the read model.
+        // This prevents race conditions during initial event creation.
+        eventReadRepository.existsById(photoChange.getEventId().toString())
+                .filter(exists -> exists)
+                .flatMap(exists -> {
+                    if ("c".equals(operation)) {
+                        log.info("Projecting cover photo addition for event ID: {}", photoChange.getEventId());
+                        return projectorService.projectCoverPhotoAdded(photoChange.getEventId(), photoChange.getPhotoUrl());
+                    } else { // 'd' for delete
+                        log.info("Projecting cover photo removal for event ID: {}", photoChange.getEventId());
+                        return projectorService.projectCoverPhotoRemoved(photoChange.getEventId(), photoChange.getPhotoUrl());
+                    }
+                })
+                .subscribe();
     }
 }

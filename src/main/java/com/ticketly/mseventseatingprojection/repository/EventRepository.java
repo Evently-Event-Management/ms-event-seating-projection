@@ -66,4 +66,28 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     @Query("{ 'category.id': ?0 }")
     @Update("{ '$set': { 'category': ?1 } }")
     Mono<Long> updateCategoryInfoInEvents(String categoryId, EventDocument.CategoryInfo categoryInfo);
+
+
+    /**
+     * Atomically adds a new photo URL to the coverPhotos array of an event.
+     * Uses $addToSet to ensure no duplicate URLs are added.
+     *
+     * @param eventId  The ID of the event document to update.
+     * @param photoUrl The public URL of the photo to add.
+     * @return A Mono emitting the number of documents modified.
+     */
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$addToSet': { 'coverPhotos': ?1 } }")
+    Mono<Long> addCoverPhotoToEvent(String eventId, String photoUrl);
+
+    /**
+     * Atomically removes a specific photo URL from the coverPhotos array of an event.
+     *
+     * @param eventId  The ID of the event document to update.
+     * @param photoUrl The public URL of the photo to remove.
+     * @return A Mono emitting the number of documents modified.
+     */
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$pull': { 'coverPhotos': ?1 } }")
+    Mono<Long> removeCoverPhotoFromEvent(String eventId, String photoUrl);
 }
