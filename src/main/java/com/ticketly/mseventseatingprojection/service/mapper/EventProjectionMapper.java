@@ -5,22 +5,35 @@ import com.ticketly.mseventseatingprojection.dto.projection.SeatingMapProjection
 import com.ticketly.mseventseatingprojection.dto.projection.SessionProjectionDTO;
 import com.ticketly.mseventseatingprojection.dto.projection.TierInfo;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
+@AllArgsConstructor
 public class EventProjectionMapper {
+
+    private final S3UrlGenerator s3UrlGenerator;
 
     public EventDocument fromProjection(EventProjectionDTO dto) {
         if (dto == null) return null;
+
+        List<String> publicCoverPhotoUrls = dto.getCoverPhotos() != null
+                ? dto.getCoverPhotos().stream()
+                .map(s3UrlGenerator::generatePublicUrl)
+                .toList()
+                : null;
+
         return EventDocument.builder()
                 .id(dto.getId().toString())
                 .title(dto.getTitle())
                 .status(dto.getStatus().name())
                 .description(dto.getDescription())
                 .overview(dto.getOverview())
-                .coverPhotos(dto.getCoverPhotos())
+                .coverPhotos(publicCoverPhotoUrls)
                 .organization(fromOrganization(dto.getOrganization()))
                 .category(fromCategory(dto.getCategory()))
                 .tiers(mapList(dto.getTiers(), this::fromTier))

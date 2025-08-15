@@ -35,6 +35,16 @@ spring:
             client-secret: ${EVENT_PROJECTION_CLIENT_SECRET}
             authorization-grant-type: client_credentials
             scope: internal-api
+
+aws:
+  s3:
+    # For local development with LocalStack
+#    local-endpoint: ${AWS_S3_LOCAL_ENDPOINT:http://localhost:4566}
+    bucket-name: ${AWS_S3_BUCKET_NAME:event-seating-uploads}
+    # For production, this would be your CloudFront or S3 static website hosting URL
+    public-base-url: ${AWS_S3_PUBLIC_URL:http://s3.localhost.localstack.cloud:4566}
+
+
 services:
   event-command:
     base-url: ${COMMAND_SERVICE_URL:http://localhost:8081/api/event-seating}

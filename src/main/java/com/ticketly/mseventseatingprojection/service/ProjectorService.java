@@ -34,6 +34,7 @@ public class ProjectorService {
     private final ObjectMapper objectMapper;
     private final EventProjectionMapper eventProjectionMapper;
     private final SessionSeatingMapper sessionSeatingMapper;
+    private final S3UrlGenerator s3UrlGenerator;
 
     public Mono<Void> projectFullEvent(UUID eventId) {
         log.info("Projecting full event for ID: {}", eventId);
@@ -88,14 +89,14 @@ public class ProjectorService {
         // 1. Upsert the document in the 'organizations' collection
         OrganizationDocument orgDoc = OrganizationDocument.builder()
                 .id(orgChange.getId().toString()).name(orgChange.getName())
-                .logoUrl(orgChange.getLogoUrl()).website(orgChange.getWebsite()).build();
+                .logoUrl(s3UrlGenerator.generatePublicUrl(orgChange.getLogoUrl())).website(orgChange.getWebsite()).build();
 
         Mono<OrganizationDocument> saveOrgMono = organizationRepository.save(orgDoc)
                 .doOnSuccess(savedDoc -> log.info("Upserted organization document with ID: {}", savedDoc.getId()));
 
         // 2. Trigger a bulk update for all events that embed this organization's info
         EventDocument.OrganizationInfo embeddedInfo = EventDocument.OrganizationInfo.builder()
-                .id(orgChange.getId().toString()).name(orgChange.getName()).logoUrl(orgChange.getLogoUrl()).build();
+                .id(orgChange.getId().toString()).name(orgChange.getName()).logoUrl(s3UrlGenerator.generatePublicUrl(orgChange.getLogoUrl())).build();
 
         Mono<Long> updateEventsMono = eventRepository.updateOrganizationInfoInEvents(orgChange.getId().toString(), embeddedInfo)
                 .doOnSuccess(count -> log.info("Updated embedded organization info for {} events.", count));
