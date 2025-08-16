@@ -1,8 +1,8 @@
 package com.ticketly.mseventseatingprojection.service;
 
 
-import com.ticketly.mseventseatingprojection.dto.projection.EventProjectionDTO;
-import com.ticketly.mseventseatingprojection.dto.projection.SessionProjectionDTO;
+import dto.projection.EventProjectionDTO;
+import dto.projection.SessionProjectionDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

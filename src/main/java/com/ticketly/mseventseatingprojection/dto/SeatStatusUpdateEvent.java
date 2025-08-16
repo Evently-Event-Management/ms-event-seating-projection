@@ -1,10 +1,10 @@
 package com.ticketly.mseventseatingprojection.dto; // Or your chosen DTO package
 
-import com.ticketly.mseventseatingprojection.model.SeatStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import model.SeatStatus;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

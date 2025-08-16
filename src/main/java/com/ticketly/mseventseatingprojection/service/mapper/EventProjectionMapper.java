@@ -1,12 +1,12 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
-import com.ticketly.mseventseatingprojection.dto.projection.EventProjectionDTO;
-import com.ticketly.mseventseatingprojection.dto.projection.SeatingMapProjectionDTO;
-import com.ticketly.mseventseatingprojection.dto.projection.SessionProjectionDTO;
-import com.ticketly.mseventseatingprojection.dto.projection.TierInfo;
-import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
+import dto.projection.EventProjectionDTO;
+import dto.projection.SeatingMapProjectionDTO;
+import dto.projection.SessionProjectionDTO;
+import dto.projection.TierInfo;
 import lombok.AllArgsConstructor;
+import model.EventDocument;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -30,7 +30,7 @@ public class EventProjectionMapper {
         return EventDocument.builder()
                 .id(dto.getId().toString())
                 .title(dto.getTitle())
-                .status(dto.getStatus().name())
+                .status(dto.getStatus())
                 .description(dto.getDescription())
                 .overview(dto.getOverview())
                 .coverPhotos(publicCoverPhotoUrls)
@@ -48,7 +48,7 @@ public class EventProjectionMapper {
                 .startTime(dto.getStartTime().toInstant())
                 .endTime(dto.getEndTime().toInstant())
                 .status(dto.getStatus())
-                .sessionType(dto.getSessionType().name())
+                .sessionType(dto.getSessionType())
                 .layoutData(fromSeatingMap(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))
                 .build();
