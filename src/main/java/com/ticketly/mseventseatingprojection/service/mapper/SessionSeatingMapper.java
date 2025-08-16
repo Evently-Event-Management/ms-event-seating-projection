@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import dto.SessionSeatingMapDTO;
 import org.springframework.stereotype.Component;
 
@@ -51,11 +52,28 @@ public class SessionSeatingMapper {
 
     private EventDocument.SeatInfo fromSeat(SessionSeatingMapDTO.Seat dto, Map<String, EventDocument.TierInfo> tierInfoMap) {
         if (dto == null) return null;
+
+        // Convert the String status from the DTO to the ReadModelSeatStatus enum
+        ReadModelSeatStatus status = null;
+        if (dto.getStatus() != null) {
+            try {
+                status = ReadModelSeatStatus.valueOf(dto.getStatus().toString().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Handle cases where the string might be invalid, default to AVAILABLE
+                status = ReadModelSeatStatus.AVAILABLE;
+            }
+        }
+
+        // We use the tierId from the DTO to look up the full TierInfo object.
+        EventDocument.TierInfo embeddedTier = dto.getTierId() != null
+                ? tierInfoMap.get(dto.getTierId())
+                : null;
+
         return EventDocument.SeatInfo.builder()
                 .id(dto.getId())
                 .label(dto.getLabel())
-                .status(dto.getStatus())
-                .tier(dto.getTierId() != null ? tierInfoMap.get(dto.getTierId()) : null)
+                .status(status) // Use the converted enum value
+                .tier(embeddedTier)
                 .build();
     }
 

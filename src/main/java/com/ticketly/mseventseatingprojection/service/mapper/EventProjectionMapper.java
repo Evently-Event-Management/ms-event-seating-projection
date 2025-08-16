@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
 import dto.projection.EventProjectionDTO;
 import dto.projection.SeatingMapProjectionDTO;
@@ -95,10 +96,21 @@ public class EventProjectionMapper {
 
     private EventDocument.SeatInfo fromSeat(SeatingMapProjectionDTO.SeatInfo dto) {
         if (dto == null) return null;
+
+        ReadModelSeatStatus status = null;
+        if (dto.getStatus() != null) {
+            try {
+                status = ReadModelSeatStatus.valueOf(dto.getStatus().toString().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Handle cases where the string might be invalid, default to AVAILABLE
+                status = ReadModelSeatStatus.AVAILABLE;
+            }
+        }
+
         return EventDocument.SeatInfo.builder()
                 .id(dto.getId())
                 .label(dto.getLabel())
-                .status(dto.getStatus())
+                .status(status)
                 .tier(fromTier(dto.getTier()))
                 .build();
     }
