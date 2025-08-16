@@ -1,6 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
-import model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;

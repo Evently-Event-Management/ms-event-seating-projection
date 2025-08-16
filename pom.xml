@@ -89,7 +89,7 @@
         <dependency>
             <groupId>com.github.Evently-Event-Management</groupId>
             <artifactId>ticketly-shared-dto</artifactId>
-            <version>V1.0.0</version>
+            <version>V1.0.1</version>
         </dependency>
     </dependencies>
 

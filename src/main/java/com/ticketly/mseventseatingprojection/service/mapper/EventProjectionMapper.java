@@ -1,12 +1,12 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
+import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
 import dto.projection.EventProjectionDTO;
 import dto.projection.SeatingMapProjectionDTO;
 import dto.projection.SessionProjectionDTO;
 import dto.projection.TierInfo;
 import lombok.AllArgsConstructor;
-import model.EventDocument;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

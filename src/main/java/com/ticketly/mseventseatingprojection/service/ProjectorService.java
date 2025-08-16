@@ -3,6 +3,9 @@ package com.ticketly.mseventseatingprojection.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketly.mseventseatingprojection.dto.CategoryChangePayload;
 import com.ticketly.mseventseatingprojection.dto.OrganizationChangePayload;
+import com.ticketly.mseventseatingprojection.model.CategoryDocument;
+import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.OrganizationDocument;
 import com.ticketly.mseventseatingprojection.repository.CategoryRepository;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.repository.OrganizationRepository;
@@ -11,9 +14,6 @@ import com.ticketly.mseventseatingprojection.service.mapper.SessionSeatingMapper
 import dto.SessionSeatingMapDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import model.CategoryDocument;
-import model.EventDocument;
-import model.OrganizationDocument;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
