@@ -26,6 +26,10 @@ spring:
 
   security:
     oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://auth.ticketly.com:8080/realms/event-ticketing/protocol/openid-connect/certs}
       client:
         provider:
           keycloak:
@@ -53,6 +57,9 @@ aws:
     # For production, this would be your CloudFront or S3 static website hosting URL
     public-base-url: ${AWS_S3_PUBLIC_URL:http://s3.localhost.localstack.cloud:4566}
 
+springdoc:
+  swagger-ui:
+    path: /docs/swagger-ui.html
 
 services:
   event-command:

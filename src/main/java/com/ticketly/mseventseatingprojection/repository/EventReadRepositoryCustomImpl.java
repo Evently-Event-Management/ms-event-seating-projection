@@ -81,4 +81,12 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 .zipWith(countMono)
                 .map(tuple -> new PageImpl<>(tuple.getT1(), pageable, tuple.getT2()));
     }
+
+    // Implementation for finding event by sessionId
+    @Override
+    public Mono<EventDocument> findEventBySessionId(String sessionId) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("sessions.id").is(sessionId));
+        return reactiveMongoTemplate.findOne(query, EventDocument.class);
+    }
 }

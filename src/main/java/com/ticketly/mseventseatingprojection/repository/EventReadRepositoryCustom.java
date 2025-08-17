@@ -26,4 +26,6 @@ public interface EventReadRepositoryCustom {
             BigDecimal priceMax,
             Pageable pageable
     );
+
+    Mono<EventDocument> findEventBySessionId(String sessionId);
 }
