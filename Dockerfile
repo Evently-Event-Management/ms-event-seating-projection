@@ -22,5 +22,7 @@ WORKDIR /app
 # Copy only the built JAR file from the builder stage
 COPY --from=builder /app/target/*.jar app.jar
 
+EXPOSE 8082
+
 # Set the command to run the application when the container starts
 ENTRYPOINT ["java","-jar","/app/app.jar"]
