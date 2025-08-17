@@ -140,8 +140,10 @@ public class DebeziumEventConsumer {
             return;
         }
 
+        // For create ('c') or update ('u'), the logic is the same:
+        // Treat the event as a signal and fetch the complete, denormalized data.
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
-        projectorService.projectCategoryChange(catChange).subscribe();
+        projectorService.projectCategoryChange(catChange.getId()).subscribe();
     }
 
     private void processCoverPhotoChange(String payload) throws Exception {

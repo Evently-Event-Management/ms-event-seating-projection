@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.service;
 
 
+import dto.projection.CategoryProjectionDTO;
 import dto.projection.EventProjectionDTO;
 import dto.projection.SessionProjectionDTO;
 import lombok.RequiredArgsConstructor;
@@ -38,5 +39,10 @@ public class EventProjectionClient {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(SessionProjectionDTO.class);
+    }
+
+    public Mono<CategoryProjectionDTO> getCategoryProjectionData(UUID categoryId) {
+        String url = String.format("%s/internal/v1/categories/%s/projection-data", eventServiceBaseUrl, categoryId);
+        return internalApiWebClient.get().uri(url).retrieve().bodyToMono(CategoryProjectionDTO.class);
     }
 }

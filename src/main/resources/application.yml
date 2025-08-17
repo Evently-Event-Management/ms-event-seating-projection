@@ -1,6 +1,12 @@
+server:
+  port: ${SERVER_PORT:8082}
+
 spring:
   application:
     name: projection-service
+
+  webflux:
+    base-path: /api/event-query
 
   data:
     mongodb:
@@ -9,7 +15,7 @@ spring:
   kafka:
     consumer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-      group-id: ${KAFKA_GROUP_ID:projection-service-group-v10}
+      group-id: ${KAFKA_GROUP_ID:projection-service-group-v16}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       # We will deserialize the value as a simple String
@@ -20,10 +26,14 @@ spring:
 
   security:
     oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://auth.ticketly.com:8080/realms/event-ticketing/protocol/openid-connect/certs}
       client:
         provider:
           keycloak:
-            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/event-ticketing}
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
         registration:
           # This client is used for M2M communication
           keycloak-m2m-client:
@@ -33,6 +43,12 @@ spring:
             authorization-grant-type: client_credentials
             scope: internal-api
 
+logging:
+  level:
+    root: INFO
+    com.ticketly: DEBUG
+    org.springframework.security: DEBUG
+
 aws:
   s3:
     # For local development with LocalStack
@@ -41,6 +57,16 @@ aws:
     # For production, this would be your CloudFront or S3 static website hosting URL
     public-base-url: ${AWS_S3_PUBLIC_URL:http://s3.localhost.localstack.cloud:4566}
 
+springdoc:
+  swagger-ui:
+    path: /docs/swagger-ui.html
+    oauth:
+      client-id: ${SWAGGER_OAUTH_CLIENT_ID:login-testing}
+      use-pkce-with-authorization-code-grant: true
+      scopes:
+        - internal-api
+      additional-query-string-params:
+        nonce: test-nonce-value
 
 services:
   event-command:
