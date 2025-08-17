@@ -14,7 +14,7 @@ jobs:
     env:
       DOCKER_USER: ${{ vars.DOCKERHUB_USERNAME }}    # Organization variable
       DOCKER_PASS: ${{ secrets.DOCKERHUB_TOKEN }}    # Organization secret
-      IMAGE_NAME: event-command-service
+      IMAGE_NAME: event-query-service
       IMAGE_TAG: latest
 
     steps:
