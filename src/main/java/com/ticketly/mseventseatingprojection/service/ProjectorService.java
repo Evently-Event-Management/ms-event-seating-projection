@@ -1,7 +1,6 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ticketly.mseventseatingprojection.dto.CategoryChangePayload;
 import com.ticketly.mseventseatingprojection.dto.OrganizationChangePayload;
 import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
@@ -112,36 +111,31 @@ public class ProjectorService {
     }
 
     // ✅ NEW: Logic for handling category changes, moved from the consumer
-    public Mono<Void> projectCategoryChange(CategoryChangePayload catChange) {
-        log.info("Projecting category change for ID: {}", catChange.getId());
-
-        Mono<CategoryDocument> parentCategoryMono = catChange.getParentId() != null
-                ? categoryRepository.findById(catChange.getParentId().toString())
-                : Mono.empty();
-
-        return parentCategoryMono.defaultIfEmpty(CategoryDocument.builder().build())
-                .flatMap(parentCat -> {
+    public Mono<Void> projectCategoryChange(UUID categoryId) {
+        log.info("Projecting category change for ID: {}", categoryId);
+        return eventProjectionClient.getCategoryProjectionData(categoryId)
+                .flatMap(catDto -> {
                     CategoryDocument catDoc = CategoryDocument.builder()
-                            .id(catChange.getId().toString())
-                            .name(catChange.getName())
-                            .parentName(parentCat.getName())
+                            .id(catDto.getId().toString())
+                            .name(catDto.getName())
+                            .parentId(catDto.getParentId() != null ? catDto.getParentId().toString() : null)
+                            .parentName(catDto.getParentName())
                             .build();
 
-                    // 1. Upsert the document in the 'categories' collection
-                    return categoryRepository.save(catDoc)
-                            .doOnSuccess(savedDoc -> log.info("Upserted category document with ID: {}", savedDoc.getId()))
-                            .then(Mono.just(catDoc)); // Pass the document down the chain
-                })
-                .flatMap(catDoc -> {
-                    // 2. Trigger a bulk update for all events that embed this category's info
+                    Mono<CategoryDocument> saveCatMono = categoryRepository.save(catDoc)
+                            .doOnSuccess(savedDoc -> log.info("Upserted category document with ID: {}", savedDoc.getId()));
+
                     EventDocument.CategoryInfo embeddedInfo = EventDocument.CategoryInfo.builder()
                             .id(catDoc.getId())
                             .name(catDoc.getName())
                             .parentName(catDoc.getParentName())
                             .build();
-                    return eventRepository.updateCategoryInfoInEvents(catDoc.getId(), embeddedInfo);
+
+                    Mono<Long> updateEventsMono = eventRepository.updateCategoryInfoInEvents(catDoc.getId(), embeddedInfo)
+                            .doOnSuccess(count -> log.info("Updated embedded category info for {} events.", count));
+
+                    return Mono.zip(saveCatMono, updateEventsMono);
                 })
-                .doOnSuccess(count -> log.info("Updated embedded category info for {} events.", count))
                 .then();
     }
 

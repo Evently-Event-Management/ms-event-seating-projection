@@ -12,5 +12,6 @@ public class CategoryDocument {
     @Id
     private String id;
     private String name;
+    private String parentId;
     private String parentName;
 }
