@@ -11,9 +11,6 @@ public class S3UrlGenerator {
     @Value("${aws.s3.public-base-url}")
     private String publicBaseUrl;
 
-    @Value("${aws.s3.bucket-name}")
-    private String bucketName;
-
     @Value("${spring.profiles.active:dev}")
     private String activeProfile;
 
@@ -32,7 +29,7 @@ public class S3UrlGenerator {
 
         // For local development, we construct the path-style URL for LocalStack
         if ("dev".equals(activeProfile)) {
-            return String.format("%s/%s/%s", publicBaseUrl, bucketName, key);
+            return String.format("%s/%s", publicBaseUrl, key);
         }
 
         // For production, the base URL would be your CDN or public S3 endpoint

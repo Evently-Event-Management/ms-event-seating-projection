@@ -51,10 +51,7 @@ logging:
 
 aws:
   s3:
-    # For local development with LocalStack
-    bucket-name: ${AWS_S3_BUCKET_NAME:ticketly-storage}
-    # For production, this would be your CloudFront or S3 static website hosting URL
-    public-base-url: ${AWS_S3_PUBLIC_URL:https://ticketly-storage.s3.us-east-1.amazonaws.com/}
+    public-base-url: ${AWS_S3_PUBLIC_URL:https://ticketly-storage.s3.us-east-1.amazonaws.com}
 
 springdoc:
   swagger-ui:
