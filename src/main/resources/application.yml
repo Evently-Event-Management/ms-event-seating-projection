@@ -1,6 +1,12 @@
+server:
+  port: ${SERVER_PORT:8082}
+
 spring:
   application:
     name: projection-service
+
+  webflux:
+    base-path: /api/event-query
 
   data:
     mongodb:
@@ -23,7 +29,7 @@ spring:
       client:
         provider:
           keycloak:
-            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/event-ticketing}
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
         registration:
           # This client is used for M2M communication
           keycloak-m2m-client:
@@ -32,6 +38,12 @@ spring:
             client-secret: ${EVENT_PROJECTION_CLIENT_SECRET}
             authorization-grant-type: client_credentials
             scope: internal-api
+
+logging:
+  level:
+    root: INFO
+    com.ticketly: DEBUG
+    org.springframework.security: DEBUG
 
 aws:
   s3:
