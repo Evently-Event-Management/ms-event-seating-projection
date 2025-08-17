@@ -10,10 +10,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -33,142 +37,246 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.categories",
             "dbz.ticketly.public.event_cover_photos"
     })
-    public void onDebeziumEvent(ConsumerRecord<String, String> record) {
+    public void onDebeziumEvent(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) throws Exception {
         String topic = record.topic();
         String payload = record.value();
 
         log.debug("Received message on topic: {}", topic);
         if (payload == null || payload.isBlank()) {
             log.debug("Received tombstone record on topic {}. Ignoring.", topic);
+            acknowledgment.acknowledge(); // Safe to acknowledge empty messages
             return;
         }
+
         try {
+            CompletableFuture<?> processingFuture = new CompletableFuture<>();
+
             // Use the topic name to decide which logic to execute
             if (topic.endsWith(".events")) {
-                processEventChange(payload);
+                processEventChange(payload, processingFuture);
             } else if (topic.endsWith(".event_sessions")) {
-                processSessionChange(payload);
+                processSessionChange(payload, processingFuture);
             } else if (topic.endsWith(".session_seating_maps")) {
-                processSeatingMapChange(payload);
+                processSeatingMapChange(payload, processingFuture);
             } else if (topic.endsWith(".organizations")) {
-                processOrganizationChange(payload);
+                processOrganizationChange(payload, processingFuture);
             } else if (topic.endsWith(".categories")) {
-                processCategoryChange(payload);
+                processCategoryChange(payload, processingFuture);
             } else if (topic.endsWith(".event_cover_photos")) {
-                processCoverPhotoChange(payload);
+                processCoverPhotoChange(payload, processingFuture);
             } else {
                 log.warn("Unhandled topic: {}", topic);
+                acknowledgment.acknowledge(); // Safe to acknowledge for unhandled topics
+                return;
             }
+
+            // Wait for processing to complete before acknowledging
+            try {
+                processingFuture.get(30, TimeUnit.SECONDS);
+                log.debug("Processing completed successfully for message on topic: {}", topic);
+                acknowledgment.acknowledge();
+            } catch (Exception e) {
+                log.error("Error while waiting for processing to complete for topic {}: {}", topic, e.getMessage());
+                // Do not acknowledge - let Kafka retry
+                throw new RuntimeException("Failed to process message", e);
+            }
+
         } catch (Exception e) {
-            log.error("Error processing Debezium event from topic {}: {}", topic, payload, e);
+            // For parsing errors, we can acknowledge since retrying won't help
+            if (e instanceof IllegalArgumentException) {
+                log.error("Error parsing Debezium event from topic {}: {}. Acknowledging message as retrying won't help.",
+                        topic, payload, e);
+                acknowledgment.acknowledge();
+            } else {
+                log.error("Error processing Debezium event from topic {}: {}", topic, payload, e);
+                // Do not acknowledge - let Kafka retry
+                throw e;
+            }
         }
     }
 
-    private void processEventChange(String payload) throws Exception {
+    private void processEventChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
         if ("d".equals(operation)) {
             UUID eventId = UUID.fromString(message.path("before").path("id").asText());
-            projectorService.deleteEvent(eventId).subscribe();
+            projectorService.deleteEvent(eventId)
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(future::completeExceptionally)
+                    .subscribe();
             return;
         }
 
         EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
         if ("APPROVED".equals(eventChange.getStatus())) {
-            projectorService.projectFullEvent(eventChange.getId()).subscribe();
+            projectorService.projectFullEvent(eventChange.getId())
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(future::completeExceptionally)
+                    .subscribe();
         } else {
-            projectorService.deleteEvent(eventChange.getId()).subscribe();
+            projectorService.deleteEvent(eventChange.getId())
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(future::completeExceptionally)
+                    .subscribe();
         }
     }
 
-    private void processSessionChange(String payload) throws Exception {
+    private void processSessionChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
-        if ("d".equals(operation)) return;
+        if ("d".equals(operation)) {
+            future.complete(null); // Nothing to do for deletes
+            return;
+        }
 
         SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
         eventReadRepository.existsById(sessionChange.getEventId().toString())
-                .filter(exists -> exists)
-                .flatMap(exists -> projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId()))
+                .flatMap(exists -> {
+                    if (exists) {
+                        return projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId())
+                                .doOnSuccess(v -> future.complete(null))
+                                .doOnError(future::completeExceptionally)
+                                .then(Mono.empty());
+                    } else {
+                        // No event exists, we can safely complete the future
+                        future.complete(null);
+                        return Mono.empty();
+                    }
+                })
                 .subscribe();
     }
 
-    private void processSeatingMapChange(String payload) throws Exception {
+    private void processSeatingMapChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
-        if ("c".equals(operation) || "d".equals(operation)) return;
+        if ("c".equals(operation) || "d".equals(operation)) {
+            future.complete(null); // Nothing to do for creates or deletes
+            return;
+        }
 
         SeatingMapChangePayload mapChange = objectMapper.treeToValue(message.path("after"), SeatingMapChangePayload.class);
         eventReadRepository.findEventBySessionId(mapChange.getSessionId().toString())
-                .flatMap(eventDocument -> {
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(eventDocument -> {
                     EventDocument.SessionInfo session = eventDocument.getSessions().stream()
                             .filter(s -> s.getId().equals(mapChange.getSessionId().toString()))
                             .findFirst().orElse(null);
 
-                    if (session == null) return Mono.empty();
-
-                    if ("ON_SALE".equals(session.getStatus())) {
-                        return projectorService.projectSeatingMapPatch(UUID.fromString(eventDocument.getId()), mapChange.getSessionId(), mapChange.getLayoutData());
-                    } else {
-                        return projectorService.projectSessionUpdate(UUID.fromString(eventDocument.getId()), mapChange.getSessionId());
+                    if (session == null) {
+                        // No session found, complete the future
+                        future.complete(null);
+                        return;
                     }
-                }).subscribe();
+
+                    Mono<Void> projectionMono;
+                    if ("ON_SALE".equals(session.getStatus())) {
+                        projectionMono = projectorService.projectSeatingMapPatch(
+                                UUID.fromString(eventDocument.getId()),
+                                mapChange.getSessionId(),
+                                mapChange.getLayoutData());
+                    } else {
+                        projectionMono = projectorService.projectSessionUpdate(
+                                UUID.fromString(eventDocument.getId()),
+                                mapChange.getSessionId());
+                    }
+
+                    projectionMono
+                            .doOnSuccess(v -> future.complete(null))
+                            .doOnError(future::completeExceptionally)
+                            .subscribe();
+                })
+                .doFinally(signalType -> {
+                    // If no event document found or on completion, ensure future is completed
+                    if (!future.isDone()) {
+                        future.complete(null);
+                    }
+                })
+                .subscribe();
     }
 
-    private void processOrganizationChange(String payload) throws Exception {
+    private void processOrganizationChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
         if ("d".equals(operation)) {
             String orgId = message.path("before").path("id").asText();
-            projectorService.deleteOrganization(orgId).subscribe();
+            projectorService.deleteOrganization(orgId)
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(future::completeExceptionally)
+                    .subscribe();
             return;
         }
 
         OrganizationChangePayload orgChange = objectMapper.treeToValue(message.path("after"), OrganizationChangePayload.class);
-        projectorService.projectOrganizationChange(orgChange).subscribe();
+        projectorService.projectOrganizationChange(orgChange)
+                .doOnSuccess(v -> future.complete(null))
+                .doOnError(future::completeExceptionally)
+                .subscribe();
     }
 
-    private void processCategoryChange(String payload) throws Exception {
+    private void processCategoryChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
         if ("d".equals(operation)) {
             String catId = message.path("before").path("id").asText();
-            projectorService.deleteCategory(catId).subscribe();
+            projectorService.deleteCategory(catId)
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(future::completeExceptionally)
+                    .subscribe();
             return;
         }
 
         // For create ('c') or update ('u'), the logic is the same:
         // Treat the event as a signal and fetch the complete, denormalized data.
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
-        projectorService.projectCategoryChange(catChange.getId()).subscribe();
+        projectorService.projectCategoryChange(catChange.getId())
+                .doOnSuccess(v -> future.complete(null))
+                .doOnError(future::completeExceptionally)
+                .subscribe();
     }
 
-    private void processCoverPhotoChange(String payload) throws Exception {
+    private void processCoverPhotoChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
-        if ("u".equals(operation)) return; // Ignore updates, not relevant for this table
+        if ("u".equals(operation)) {
+            future.complete(null); // Ignore updates, not relevant for this table
+            return;
+        }
 
         // Determine which part of the payload to use based on the operation
         JsonNode dataNode = "d".equals(operation) ? message.path("before") : message.path("after");
-        if (dataNode.isMissingNode()) return;
+        if (dataNode.isMissingNode()) {
+            future.complete(null);
+            return;
+        }
 
         CoverPhotoChangePayload photoChange = objectMapper.treeToValue(dataNode, CoverPhotoChangePayload.class);
 
         // ✅ CRITICAL: Only process the change if the parent event already exists in the read model.
         // This prevents race conditions during initial event creation.
         eventReadRepository.existsById(photoChange.getEventId().toString())
-                .filter(exists -> exists)
                 .flatMap(exists -> {
-                    if ("c".equals(operation)) {
-                        log.info("Projecting cover photo addition for event ID: {}", photoChange.getEventId());
-                        return projectorService.projectCoverPhotoAdded(photoChange.getEventId(), photoChange.getPhotoUrl());
-                    } else { // 'd' for delete
-                        log.info("Projecting cover photo removal for event ID: {}", photoChange.getEventId());
-                        return projectorService.projectCoverPhotoRemoved(photoChange.getEventId(), photoChange.getPhotoUrl());
+                    if (exists) {
+                        if ("c".equals(operation)) {
+                            log.info("Projecting cover photo addition for event ID: {}", photoChange.getEventId());
+                            return projectorService.projectCoverPhotoAdded(photoChange.getEventId(), photoChange.getPhotoUrl())
+                                    .doOnSuccess(v -> future.complete(null))
+                                    .doOnError(future::completeExceptionally)
+                                    .then(Mono.empty());
+                        } else { // 'd' for delete
+                            log.info("Projecting cover photo removal for event ID: {}", photoChange.getEventId());
+                            return projectorService.projectCoverPhotoRemoved(photoChange.getEventId(), photoChange.getPhotoUrl())
+                                    .doOnSuccess(v -> future.complete(null))
+                                    .doOnError(future::completeExceptionally)
+                                    .then(Mono.empty());
+                        }
+                    } else {
+                        // No event exists, we can safely complete the future
+                        future.complete(null);
+                        return Mono.empty();
                     }
                 })
                 .subscribe();
