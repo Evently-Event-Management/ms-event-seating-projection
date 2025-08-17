@@ -1,4 +1,4 @@
-package com.ticketly.mseventseatingprojection.dto;
+package com.ticketly.mseventseatingprojection.dto.internal;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

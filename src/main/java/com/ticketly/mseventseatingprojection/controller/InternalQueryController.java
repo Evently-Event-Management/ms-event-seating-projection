@@ -1,16 +1,18 @@
 package com.ticketly.mseventseatingprojection.controller;
 
-import com.ticketly.mseventseatingprojection.dto.SeatValidationRequest;
-import com.ticketly.mseventseatingprojection.dto.SeatValidationResponse;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsRequest;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationRequest;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/internal/v1/sessions") // Dedicated path for internal M2M calls
@@ -27,7 +29,7 @@ public class InternalQueryController {
      * @return A 200 OK if all seats are available, or a 409 Conflict if any are not.
      */
     @PostMapping("/{sessionId}/seats/validate")
-    // In production, you would secure this with @PreAuthorize("hasAuthority('SCOPE_internal-api')")
+    @PreAuthorize("hasAuthority('SCOPE_internal-api')")
     public Mono<ResponseEntity<SeatValidationResponse>> validateSeats(
             @PathVariable String sessionId,
             @Valid @RequestBody SeatValidationRequest request) {
@@ -42,5 +44,22 @@ public class InternalQueryController {
                         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
                     }
                 });
+    }
+
+    /**
+     * Secure M2M endpoint for the Ticket/Order Service to get detailed information about seats.
+     * This provides authoritative data about each seat, including its tier and price.
+     *
+     * @param sessionId The ID of the session containing the seats.
+     * @param request   The request containing the seat IDs to retrieve details for.
+     * @return A list of seat details.
+     */
+    @PostMapping("/{sessionId}/seats/details")
+    @PreAuthorize("hasAuthority('SCOPE_internal-api')")
+    public Flux<SeatDetailsResponse> getSeatDetails(
+            @PathVariable String sessionId,
+            @Valid @RequestBody SeatDetailsRequest request) {
+
+        return eventQueryService.getSeatDetails(sessionId, request.getSeatIds());
     }
 }

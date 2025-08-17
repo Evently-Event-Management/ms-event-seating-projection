@@ -1,14 +1,12 @@
-package com.ticketly.mseventseatingprojection.dto;
+package com.ticketly.mseventseatingprojection.dto.internal;
 
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Request DTO sent from the Order Service to the Query Service
