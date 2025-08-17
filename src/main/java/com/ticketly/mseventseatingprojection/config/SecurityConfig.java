@@ -19,8 +19,11 @@ public class SecurityConfig {
                                 "/docs/swagger-ui.html",
                                 "/docs/swagger-ui/**",
                                 "/v3/api-docs/**",
+                                "/webjars/**",
+                                "/swagger-ui/**",
                                 "/v1/events/**",
-                                "/v1/categories/**"
+                                "/v1/categories/**",
+                                "/oauth2/**" // Add this path to support OAuth2 redirects
                         ).permitAll()
                         .anyExchange().authenticated()
                 )
@@ -30,4 +33,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

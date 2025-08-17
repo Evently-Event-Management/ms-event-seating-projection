@@ -60,6 +60,13 @@ aws:
 springdoc:
   swagger-ui:
     path: /docs/swagger-ui.html
+    oauth:
+      client-id: ${SWAGGER_OAUTH_CLIENT_ID:login-testing}
+      use-pkce-with-authorization-code-grant: true
+      scopes:
+        - internal-api
+      additional-query-string-params:
+        nonce: test-nonce-value
 
 services:
   event-command:
