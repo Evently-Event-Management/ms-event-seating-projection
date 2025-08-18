@@ -162,4 +162,10 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 EventDocument.class
         );
     }
+
+    @Override
+    public Mono<EventDocument> findEventById(String eventId) {
+        Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
+        return reactiveMongoTemplate.findOne(query, EventDocument.class);
+    }
 }

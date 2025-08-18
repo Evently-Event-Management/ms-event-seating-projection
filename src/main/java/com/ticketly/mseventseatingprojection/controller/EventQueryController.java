@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,5 +44,12 @@ public class EventQueryController {
                 searchTerm, categoryId, longitude, latitude, radiusKm,
                 dateFrom, dateTo, priceMin, priceMax, pageable
         ).map(ResponseEntity::ok);
+    }
+
+    @GetMapping("/{eventId}/basic-info")
+    public Mono<ResponseEntity<EventBasicInfoDTO>> getBasicEventInfo(@PathVariable String eventId) {
+        return eventQueryService.getBasicEventInfo(eventId)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }
