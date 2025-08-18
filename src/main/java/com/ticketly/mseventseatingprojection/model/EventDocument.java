@@ -6,9 +6,7 @@ import model.EventStatus;
 import model.SessionType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
-import org.springframework.data.mongodb.core.index.TextIndexed;
+import org.springframework.data.mongodb.core.index.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -23,7 +21,8 @@ public class EventDocument {
     @Id
     private String id;
 
-    @TextIndexed
+    @TextIndexed(weight = 5.0f)
+    @Indexed
     private String title;
     private EventStatus status;
 
