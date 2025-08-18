@@ -49,7 +49,7 @@ public class EventProjectionMapper {
                 .id(dto.getId().toString())
                 .startTime(dto.getStartTime().toInstant())
                 .endTime(dto.getEndTime().toInstant())
-                .status(dto.getStatus())
+                .status(dto.getSessionStatus())
                 .sessionType(dto.getSessionType())
                 .layoutData(fromSeatingMap(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))

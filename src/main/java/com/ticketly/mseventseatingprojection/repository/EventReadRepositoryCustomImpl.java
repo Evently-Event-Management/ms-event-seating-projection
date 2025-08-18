@@ -12,9 +12,7 @@ import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
-import org.springframework.data.mongodb.core.aggregation.TypedAggregation;
+import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.NearQuery;
 import org.springframework.data.mongodb.core.query.Query;
@@ -168,4 +166,50 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
     }
+
+    @Override
+    public Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable) {
+        // --- Aggregation Pipeline for Sessions ---
+
+        // Stage 1: Match the parent event document by its ID.
+        AggregationOperation matchEvent = Aggregation.match(Criteria.where("_id").is(eventId));
+
+        // Stage 2: Deconstruct the sessions array into a stream of documents.
+        AggregationOperation unwindSessions = Aggregation.unwind("sessions");
+
+        // Stage 3: Promote the session sub-document to the root level.
+        AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
+
+        // Stage 4: Project the fields, explicitly excluding layoutData.
+        AggregationOperation projectFields = Aggregation.project(
+                "id", "startTime", "endTime", "status", "sessionType", "venueDetails"
+        );
+
+        // --- COUNTING ---
+        // To get the total count of sessions for pagination, we find the document and get the array size.
+        // This is more efficient than a separate count aggregation.
+        Mono<Long> countMono = reactiveMongoTemplate.findById(eventId, EventDocument.class)
+                .map(event -> (long) event.getSessions().size())
+                .defaultIfEmpty(0L);
+
+        // --- EXECUTION ---
+        // Build the pipeline for fetching the paginated data.
+        TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(
+                EventDocument.SessionInfo.class,
+                matchEvent,
+                unwindSessions,
+                replaceRoot,
+                projectFields,
+                Aggregation.sort(pageable.getSort()),
+                Aggregation.skip(pageable.getOffset()),
+                Aggregation.limit(pageable.getPageSize())
+        );
+
+        // Execute the aggregation and combine with the count to create the Page object.
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.SessionInfo.class)
+                .collectList()
+                .zipWith(countMono)
+                .map(tuple -> new PageImpl<>(tuple.getT1(), pageable, tuple.getT2()));
+    }
+
 }

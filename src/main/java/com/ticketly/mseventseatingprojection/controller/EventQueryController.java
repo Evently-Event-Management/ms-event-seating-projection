@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
@@ -49,6 +50,16 @@ public class EventQueryController {
     @GetMapping("/{eventId}/basic-info")
     public Mono<ResponseEntity<EventBasicInfoDTO>> getBasicEventInfo(@PathVariable String eventId) {
         return eventQueryService.getBasicEventInfo(eventId)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{eventId}/sessions")
+    public Mono<ResponseEntity<Page<SessionInfoDTO>>> getEventSessions(
+            @PathVariable String eventId,
+            @PageableDefault(sort = "startTime", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        return eventQueryService.findSessionsByEventId(eventId, pageable)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

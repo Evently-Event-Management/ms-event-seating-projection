@@ -1,10 +1,14 @@
 package com.ticketly.mseventseatingprojection.service;
 
+import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationRequest;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +38,55 @@ public class EventQueryService {
                 searchTerm, categoryId, longitude, latitude, radiusKm,
                 dateFrom, dateTo, priceMin, priceMax, pageable
         ).map(eventPage -> eventPage.map(this::mapToThumbnailDTO));
+    }
+
+
+    /**
+     * Validates if a list of seats for a given session are all available.
+     *
+     * @param sessionId The ID of the session.
+     * @param request   The request containing the list of seat IDs to check.
+     * @return A Mono emitting a response indicating availability.
+     */
+    public Mono<SeatValidationResponse> validateSeatsAvailability(String sessionId, SeatValidationRequest request) {
+        return eventReadRepository.findEventBySessionId(sessionId)
+                .map(eventDocument -> {
+                    // Find the specific session within the event document
+                    EventDocument.SessionInfo session = eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (session == null || session.getLayoutData() == null) {
+                        // If session or layout doesn't exist, seats are considered unavailable
+                        return SeatValidationResponse.builder()
+                                .allAvailable(false)
+                                .unavailableSeats(request.getSeatIds())
+                                .build();
+                    }
+
+                    // Create a set of all available seat IDs in the session for fast lookup
+                    var availableSeats = session.getLayoutData().getLayout().getBlocks().stream()
+                            .flatMap(block -> block.getRows() != null ? block.getRows().stream() : block.getSeats().stream())
+                            .flatMap(rowOrSeat -> rowOrSeat instanceof EventDocument.RowInfo ? ((EventDocument.RowInfo) rowOrSeat).getSeats().stream() : Stream.of((EventDocument.SeatInfo) rowOrSeat))
+                            .filter(seat -> ReadModelSeatStatus.AVAILABLE.equals(seat.getStatus()))
+                            .map(EventDocument.SeatInfo::getId)
+                            .collect(Collectors.toSet());
+
+                    // Find which of the requested seats are NOT in the available set
+                    List<String> unavailableSeats = request.getSeatIds().stream()
+                            .filter(requestedSeatId -> !availableSeats.contains(requestedSeatId))
+                            .collect(Collectors.toList());
+
+                    return SeatValidationResponse.builder()
+                            .allAvailable(unavailableSeats.isEmpty())
+                            .unavailableSeats(unavailableSeats)
+                            .build();
+                })
+                .defaultIfEmpty(SeatValidationResponse.builder()
+                        .allAvailable(false)
+                        .unavailableSeats(request.getSeatIds())
+                        .build());
     }
 
     /**
@@ -193,5 +246,31 @@ public class EventQueryService {
                                         .build())
                                 .collect(Collectors.toList()) : Collections.emptyList())
                         .build()).switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
+    }
+
+    public Mono<Page<SessionInfoDTO>> findSessionsByEventId(String eventId, Pageable pageable) {
+        return eventReadRepository.findSessionsByEventId(eventId, pageable)
+                .map(sessionPage -> sessionPage.map(this::mapToSessionInfoDTO));
+    }
+
+    private SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session) {
+        SessionInfoDTO.VenueDetailsInfo venueDetailsDTO = null;
+        if (session.getVenueDetails() != null) {
+            venueDetailsDTO = SessionInfoDTO.VenueDetailsInfo.builder()
+                    .name(session.getVenueDetails().getName())
+                    .address(session.getVenueDetails().getAddress())
+                    .onlineLink(session.getVenueDetails().getOnlineLink())
+                    .location(session.getVenueDetails().getLocation())
+                    .build();
+        }
+
+        return SessionInfoDTO.builder()
+                .id(session.getId())
+                .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
+                .status(session.getStatus())
+                .sessionType(session.getSessionType())
+                .venueDetails(venueDetailsDTO)
+                .build();
     }
 }

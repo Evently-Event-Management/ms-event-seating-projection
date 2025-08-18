@@ -3,6 +3,7 @@ package com.ticketly.mseventseatingprojection.model;
 import lombok.Builder;
 import lombok.Data;
 import model.EventStatus;
+import model.SessionStatus;
 import model.SessionType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
@@ -69,7 +70,7 @@ public class EventDocument {
         private String id;
         private Instant startTime;
         private Instant endTime;
-        private String status;
+        private SessionStatus status;
         private SessionType sessionType;
         private VenueDetailsInfo venueDetails;
         private SessionSeatingMapInfo layoutData;
