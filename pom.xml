@@ -89,7 +89,7 @@
         <dependency>
             <groupId>com.github.Evently-Event-Management</groupId>
             <artifactId>ticketly-shared-dto</artifactId>
-            <version>V1.0.6</version>
+            <version>V1.0.9</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

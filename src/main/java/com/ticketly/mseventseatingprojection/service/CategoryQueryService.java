@@ -20,4 +20,13 @@ public class CategoryQueryService {
     public Flux<CategoryDocument> getAllCategories() {
         return categoryRepository.findAll();
     }
+
+    /**
+     * Fetches only parent categories (where parentId is null).
+     *
+     * @return A Flux emitting parent category documents.
+     */
+    public Flux<CategoryDocument> getParentCategories() {
+        return categoryRepository.findByParentIdIsNull();
+    }
 }

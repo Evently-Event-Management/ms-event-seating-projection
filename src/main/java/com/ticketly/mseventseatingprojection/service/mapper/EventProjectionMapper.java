@@ -8,6 +8,7 @@ import dto.projection.SeatingMapProjectionDTO;
 import dto.projection.SessionProjectionDTO;
 import dto.projection.TierInfo;
 import lombok.AllArgsConstructor;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -145,18 +146,17 @@ public class EventProjectionMapper {
 
     private EventDocument.VenueDetailsInfo fromVenue(SessionProjectionDTO.VenueDetailsInfo dto) {
         if (dto == null) return null;
+        GeoJsonPoint location = null;
+
+        if (dto.getLatitude() != null && dto.getLongitude() != null) {
+            location = new GeoJsonPoint(dto.getLongitude(), dto.getLatitude());
+        }
+
         return EventDocument.VenueDetailsInfo.builder()
                 .name(dto.getName())
                 .address(dto.getAddress())
                 .onlineLink(dto.getOnlineLink())
-                .location(fromGeoJson(dto.getLocation()))
-                .build();
-    }
-
-    private EventDocument.GeoJsonPoint fromGeoJson(SessionProjectionDTO.GeoJsonPoint dto) {
-        if (dto == null) return null;
-        return EventDocument.GeoJsonPoint.builder()
-                .coordinates(dto.getCoordinates())
+                .location(location)
                 .build();
     }
 

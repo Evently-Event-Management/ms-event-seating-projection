@@ -25,4 +25,14 @@ public class CategoryController {
     public ResponseEntity<Flux<CategoryDocument>> getAllCategories() {
         return ResponseEntity.ok(categoryQueryService.getAllCategories());
     }
+
+    /**
+     * Public endpoint to fetch only parent categories (where parentId is null).
+     *
+     * @return A Flux of parent category documents.
+     */
+    @GetMapping("/parents")
+    public ResponseEntity<Flux<CategoryDocument>> getParentCategories() {
+        return ResponseEntity.ok(categoryQueryService.getParentCategories());
+    }
 }

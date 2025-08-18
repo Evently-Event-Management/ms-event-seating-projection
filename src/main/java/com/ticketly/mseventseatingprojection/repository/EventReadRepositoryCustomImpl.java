@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ import java.util.List;
 public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom {
 
     private final ReactiveMongoTemplate reactiveMongoTemplate;
+    private final CategoryReadRepository categoryReadRepository;
 
     @Override
     public Mono<Page<EventDocument>> searchEvents(
@@ -40,10 +42,42 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
             query.addCriteria(TextCriteria.forDefaultLanguage().matching(searchTerm));
         }
 
-        // 2. Category Filter
+        // 2. Category Filter - Modified to handle parent categories
         if (categoryId != null) {
-            criteriaList.add(Criteria.where("category.id").is(categoryId));
+            // First, check if this is a parent category with subcategories
+            return categoryReadRepository.findByParentId(categoryId)
+                    .collectList()
+                    .flatMap(subcategories -> {
+                        if (!subcategories.isEmpty()) {
+                            // It's a parent category, collect all subcategory IDs
+                            List<String> allCategoryIds = new ArrayList<>();
+                            allCategoryIds.add(categoryId); // Include the parent category too
+                            allCategoryIds.addAll(subcategories.stream()
+                                    .map(CategoryDocument::getId)
+                                    .toList());
+
+                            // Use 'in' operator to match any of these categories
+                            criteriaList.add(Criteria.where("category.id").in(allCategoryIds));
+                        } else {
+                            // Not a parent category or no subcategories, use exact match
+                            criteriaList.add(Criteria.where("category.id").is(categoryId));
+                        }
+
+                        return applyFiltersAndExecuteQuery(query, criteriaList, longitude, latitude,
+                                radiusKm, dateFrom, dateTo, priceMin, priceMax, pageable);
+                    });
         }
+
+        // If no category filter, continue with other filters
+        return applyFiltersAndExecuteQuery(query, criteriaList, longitude, latitude,
+                radiusKm, dateFrom, dateTo, priceMin, priceMax, pageable);
+    }
+
+    private Mono<Page<EventDocument>> applyFiltersAndExecuteQuery(
+            Query query, List<Criteria> criteriaList,
+            Double longitude, Double latitude, Integer radiusKm,
+            Instant dateFrom, Instant dateTo, BigDecimal priceMin, BigDecimal priceMax,
+            Pageable pageable) {
 
         // 3. Date Range Filter
         if (dateFrom != null || dateTo != null) {
@@ -65,7 +99,8 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         if (longitude != null && latitude != null && radiusKm != null) {
             GeoJsonPoint userLocation = new GeoJsonPoint(longitude, latitude);
             Distance radius = new Distance(radiusKm, Metrics.KILOMETERS);
-            criteriaList.add(Criteria.where("sessions.venueDetails.location").nearSphere(userLocation).maxDistance(radius.getValue()));
+            double ds = radius.getNormalizedValue();
+            criteriaList.add(Criteria.where("sessions.venueDetails.location").nearSphere(userLocation).maxDistance(radius.getNormalizedValue()));
         }
 
         // Always filter for APPROVED events

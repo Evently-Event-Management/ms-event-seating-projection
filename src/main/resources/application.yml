@@ -11,11 +11,12 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating}
+      auto-index-creation: true
 
   kafka:
     consumer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-      group-id: ${KAFKA_GROUP_ID:projection-service-group-v16}
+      group-id: ${KAFKA_GROUP_ID:projection-service-group-v23}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       # We will deserialize the value as a simple String
@@ -47,7 +48,7 @@ logging:
   level:
     root: INFO
     com.ticketly: DEBUG
-    org.springframework.security: DEBUG
+    org.springframework.security: WARN
 
 aws:
   s3:
