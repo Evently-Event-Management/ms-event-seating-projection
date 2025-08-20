@@ -8,6 +8,7 @@ import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
 import lombok.RequiredArgsConstructor;
@@ -272,5 +273,16 @@ public class EventQueryService {
                 .sessionType(session.getSessionType())
                 .venueDetails(venueDetailsDTO)
                 .build();
+    }
+
+    /**
+     * Fetches the seating map information for a specific session by its ID.
+     *
+     * @param sessionId The ID of the session
+     * @return A Mono emitting the seating map information or empty if not found
+     */
+    public Mono<SessionSeatingMapInfo> getSessionSeatingMap(String sessionId) {
+        return eventReadRepository.findSeatingMapBySessionId(sessionId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "sessionId", sessionId)));
     }
 }

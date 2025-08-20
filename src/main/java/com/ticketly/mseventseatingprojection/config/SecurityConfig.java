@@ -23,6 +23,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v1/events/**",
                                 "/v1/categories/**",
+                                "/v1/sessions/**",
                                 "/oauth2/**" // Add this path to support OAuth2 redirects
                         ).permitAll()
                         .anyExchange().authenticated()

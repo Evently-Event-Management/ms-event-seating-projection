@@ -67,6 +67,7 @@ public class EventDocument {
     @Data
     @Builder
     public static class SessionInfo {
+        @Indexed
         private String id;
         private Instant startTime;
         private Instant endTime;

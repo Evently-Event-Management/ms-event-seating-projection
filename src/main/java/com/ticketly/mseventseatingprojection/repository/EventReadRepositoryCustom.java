@@ -32,4 +32,12 @@ public interface EventReadRepositoryCustom {
     Mono<EventDocument> findEventById(String eventId);
 
     Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable);
+
+    /**
+     * Finds the seating map for a specific session by its ID.
+     *
+     * @param sessionId The ID of the session
+     * @return A Mono emitting the SessionSeatingMapInfo for the given session or empty if not found
+     */
+    Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId);
 }
