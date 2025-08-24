@@ -215,16 +215,16 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     @Override
     public Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId) {
         return reactiveMongoTemplate.findOne(
-                new Query(Criteria.where("sessions.id").is(sessionId)),
-                EventDocument.class
-        )
-        .flatMap(eventDocument -> {
-            // Find the specific session within the event document
-            return Mono.justOrEmpty(eventDocument.getSessions().stream()
-                    .filter(s -> s.getId().equals(sessionId))
-                    .findFirst()
-                    .map(EventDocument.SessionInfo::getLayoutData));
-        });
+                        new Query(Criteria.where("sessions.id").is(sessionId)),
+                        EventDocument.class
+                )
+                .flatMap(eventDocument -> {
+                    // Find the specific session within the event document
+                    return Mono.justOrEmpty(eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst()
+                            .map(EventDocument.SessionInfo::getLayoutData));
+                });
     }
 
 }
