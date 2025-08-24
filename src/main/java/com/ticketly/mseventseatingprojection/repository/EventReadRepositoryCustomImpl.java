@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.NearQuery;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.TextCriteria;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -227,4 +228,36 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 });
     }
 
+    @Override
+    public Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
+        // Match the event by ID
+        AggregationOperation matchEvent = Aggregation.match(Criteria.where("_id").is(eventId));
+
+        // Unwind the sessions array
+        AggregationOperation unwindSessions = Aggregation.unwind("sessions");
+
+        // Match sessions within the date range
+        AggregationOperation matchDateRange = Aggregation.match(Criteria.where("sessions.startTime").gte(fromDate).lte(toDate));
+
+        // Replace root to promote session sub-document
+        AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
+
+        // Project only necessary fields for SessionInfoDTO
+        AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails");
+
+        // Build the aggregation pipeline
+        TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(
+                EventDocument.SessionInfo.class,
+                matchEvent,
+                unwindSessions,
+                matchDateRange,
+                replaceRoot,
+                projectFields
+        );
+
+        // Execute the aggregation and return the results
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.SessionInfo.class);
+    }
+
 }
+

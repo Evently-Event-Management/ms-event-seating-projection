@@ -3,6 +3,7 @@ package com.ticketly.mseventseatingprojection.repository;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -40,4 +41,6 @@ public interface EventReadRepositoryCustom {
      * @return A Mono emitting the SessionSeatingMapInfo for the given session or empty if not found
      */
     Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId);
+
+    public Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate);
 }

@@ -285,4 +285,17 @@ public class EventQueryService {
         return eventReadRepository.findSeatingMapBySessionId(sessionId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "sessionId", sessionId)));
     }
+
+    /**
+     * Fetches sessions within a specific date range for a given event ID.
+     *
+     * @param eventId  The ID of the event.
+     * @param fromDate The start date of the range.
+     * @param toDate   The end date of the range.
+     * @return A Flux emitting the session information.
+     */
+    public Flux<SessionInfoDTO> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
+        return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
+                .map(this::mapToSessionInfoDTO);
+    }
 }

@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/events")
@@ -60,6 +61,18 @@ public class EventQueryController {
             @PageableDefault(sort = "startTime", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         return eventQueryService.findSessionsByEventId(eventId, pageable)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{eventId}/sessions-in-range")
+    public Mono<ResponseEntity<List<SessionInfoDTO>>> getSessionsInRange(
+            @PathVariable String eventId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toDate
+    ) {
+        return eventQueryService.findSessionsInRange(eventId, fromDate, toDate)
+                .collectList()
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
