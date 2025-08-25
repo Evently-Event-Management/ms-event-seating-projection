@@ -65,7 +65,7 @@ public class EventQueryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/{eventId}/sessions-in-range")
+    @GetMapping("/{eventId}/sessions/sessions-in-range")
     public Mono<ResponseEntity<List<SessionInfoDTO>>> getSessionsInRange(
             @PathVariable String eventId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,

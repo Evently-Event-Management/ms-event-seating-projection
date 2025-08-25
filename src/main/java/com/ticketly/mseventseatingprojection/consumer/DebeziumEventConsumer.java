@@ -8,6 +8,7 @@ import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.service.ProjectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.SessionStatus;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -170,15 +171,18 @@ public class DebeziumEventConsumer {
                     }
 
                     Mono<Void> projectionMono;
-                    if ("ON_SALE".equals(session.getStatus())) {
+                    if (SessionStatus.ON_SALE.equals(session.getStatus())) {
                         projectionMono = projectorService.projectSeatingMapPatch(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId(),
                                 mapChange.getLayoutData());
-                    } else {
+                    } else if (SessionStatus.SCHEDULED.equals(session.getStatus())) {
                         projectionMono = projectorService.projectSessionUpdate(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId());
+                    } else {
+                        future.complete(null);
+                        return;
                     }
 
                     projectionMono
