@@ -183,7 +183,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         // Stage 4: Project the fields, explicitly excluding layoutData.
         AggregationOperation projectFields = Aggregation.project(
-                "id", "startTime", "endTime", "status", "sessionType", "venueDetails"
+                "id", "startTime", "endTime", "status", "sessionType", "venueDetails", "salesStartTime"
         );
 
         // --- COUNTING ---
@@ -243,7 +243,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
 
         // Project only necessary fields for SessionInfoDTO
-        AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails");
+        AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails", "salesStartTime");
 
         // Build the aggregation pipeline
         TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(

@@ -122,7 +122,7 @@ public class EventProjectionMapper {
         return EventDocument.OrganizationInfo.builder()
                 .id(dto.getId().toString())
                 .name(dto.getName())
-                .logoUrl(dto.getLogoUrl())
+                .logoUrl(s3UrlGenerator.generatePublicUrl(dto.getLogoUrl()))
                 .build();
     }
 

@@ -299,4 +299,21 @@ public class EventQueryService {
         return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
                 .map(this::mapToSessionInfoDTO);
     }
+
+    /**
+     * Fetches a single session by its ID without the seating map layout data.
+     *
+     * @param sessionId The ID of the session to fetch.
+     * @return A Mono emitting the session information or empty if not found.
+     */
+    public Mono<SessionInfoDTO> getSessionById(String sessionId) {
+        return eventReadRepository.findEventBySessionId(sessionId)
+                .flatMap(eventDocument -> {
+                    // Find the specific session within the event document
+                    return Mono.justOrEmpty(eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst()
+                            .map(this::mapToSessionInfoDTO));
+                });
+    }
 }

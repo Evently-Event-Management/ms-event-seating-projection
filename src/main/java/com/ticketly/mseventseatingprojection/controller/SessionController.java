@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,20 @@ public class SessionController {
     @GetMapping("/{sessionId}/seating-map")
     public Mono<ResponseEntity<SessionSeatingMapInfo>> getSessionSeatingMap(@PathVariable String sessionId) {
         return eventQueryService.getSessionSeatingMap(sessionId)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Retrieves session information by session ID.
+     * This endpoint returns only the session metadata without the seating map layout data.
+     *
+     * @param sessionId The ID of the session to retrieve
+     * @return A Mono emitting the session information or a not found response
+     */
+    @GetMapping("/{sessionId}/basic-info")
+    public Mono<ResponseEntity<SessionInfoDTO>> getSessionById(@PathVariable String sessionId) {
+        return eventQueryService.getSessionById(sessionId)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

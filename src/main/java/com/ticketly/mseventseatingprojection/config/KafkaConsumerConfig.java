@@ -149,13 +149,12 @@ import java.util.Map;
 @Slf4j
 public class KafkaConsumerConfig {
 
-    // ✅ Corrected property paths
+    // Use correct property path matching application.yml
     @Value("${spring.kafka.consumer.bootstrap-servers}")
     private String bootstrapServers;
 
     @Value("${spring.kafka.consumer.group-id}")
     private String defaultGroupId;
-
 
     // =========================================================================
     // == BEANS FOR DEBEZIUM CONSUMER (using StringDeserializer)
@@ -168,6 +167,8 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "debezium-projection-group");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        // Set auto.offset.reset to ensure messages are received
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
@@ -176,9 +177,13 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(debeziumConsumerFactory());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        // Add error handler for debezium consumers
+        DefaultErrorHandler errorHandler = getDefaultErrorHandler();
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
-
 
     // ============================================================================
     // == BEANS FOR DEFAULT CONSUMERS (using JsonDeserializer)
@@ -189,13 +194,15 @@ public class KafkaConsumerConfig {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, defaultGroupId);
+
+        // Configure JsonDeserializer properties through the properties map
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, SeatStatusChangeEventDto.class.getName());
 
         return new DefaultKafkaConsumerFactory<>(
-                props,
-                new StringDeserializer(),
-                new JsonDeserializer<>()
+            props,
+            new StringDeserializer(),
+            new JsonDeserializer<>()
         );
     }
 
