@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,15 +31,19 @@ public class SseService {
         String sessionIdStr = sessionId.toString();
         log.info("Registering new SSE client for session: {}", sessionIdStr);
 
-        // computeIfAbsent ensures that we create a new sink only if one doesn't already exist for this session.
-        // Sinks.many().multicast().onBackpressureBuffer() is ideal for broadcasting to multiple subscribers.
+        // Use replay().latest() instead of multicast().onBackpressureBuffer()
         Sinks.Many<ServerSentEvent<SeatStatusUpdateDto>> sink = sinks.computeIfAbsent(
                 sessionIdStr,
-                id -> Sinks.many().multicast().onBackpressureBuffer()
+                id -> Sinks.many().replay().latest()
         );
 
-        // When a client disconnects (doOnCancel) or the stream terminates, we check if we should remove the sink.
-        return sink.asFlux()
+        // Heartbeat event every 15 seconds for connection stability
+        Flux<ServerSentEvent<SeatStatusUpdateDto>> heartbeatFlux = Flux.interval(Duration.ofSeconds(15))
+                .map(i -> ServerSentEvent.<SeatStatusUpdateDto>builder()
+                        .comment("keep-alive")
+                        .build());
+
+        return Flux.merge(sink.asFlux(), heartbeatFlux)
                 .doOnCancel(() -> handleDisconnect(sessionIdStr));
     }
 
