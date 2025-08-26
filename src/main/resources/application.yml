@@ -42,6 +42,7 @@ logging:
     root: INFO
     com.ticketly: DEBUG
     org.springframework.security: WARN
+    org.springframework.data.mongodb.core.ReactiveMongoTemplate: TRACE
 
 aws:
   s3:

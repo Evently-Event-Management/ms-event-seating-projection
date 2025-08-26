@@ -35,30 +35,27 @@ public class SeatStatusService {
                 .flatMap(event -> {
                     String eventId = event.getId();
 
-                    // Create query to find the event document
-                    Query query = new Query(Criteria.where("_id").is(eventId));
+                    Query query = Query.query(Criteria.where("_id").is(eventId));
 
-                    // Create update for block rows seats
-                    Update rowSeatsUpdate = new Update();
-                    rowSeatsUpdate.set("sessions.$[session].layoutData.layout.blocks.$[].rows.$[].seats.$[seat].status", seatStatus.toString());
+                    Update update = new Update()
+                            .set("sessions.$[sess].layoutData.layout.blocks.$[].rows.$[].seats.$[seat].status", seatStatus.toString())
+                            .set("sessions.$[sess].layoutData.layout.blocks.$[].seats.$[seat].status", seatStatus.toString())
+                            .filterArray("sess._id", sessionId)
+                            // ✅ FINAL FIX: Use the actual DB field name '_id' for the seat as well.
+                            .filterArray(Criteria.where("seat._id").in(seatIds));
 
-                    // Create update for block seats (standing blocks)
-                    Update blockSeatsUpdate = new Update();
-                    blockSeatsUpdate.set("sessions.$[session].layoutData.layout.blocks.$[].seats.$[seat].status", seatStatus.toString());
-
-                    // Add array filter for session and seats
-                    rowSeatsUpdate.filterArray("session.id", sessionId);
-                    rowSeatsUpdate.filterArray("seat.id", new Criteria().in(seatIds));
-
-                    blockSeatsUpdate.filterArray("session.id", sessionId);
-                    blockSeatsUpdate.filterArray("seat.id", new Criteria().in(seatIds));
-
-                    // Execute updates one after another
-                    return mongoTemplate.updateMulti(query, rowSeatsUpdate, EventDocument.class)
-                            .then(mongoTemplate.updateMulti(query, blockSeatsUpdate, EventDocument.class))
+                    return mongoTemplate.update(EventDocument.class)
+                            .inCollection("events")
+                            .matching(query)
+                            .apply(update)
+                            .all()
+                            .doOnSuccess(updateResult -> log.info(
+                                    "MongoDB update result: Matched Count: {}, Modified Count: {}",
+                                    updateResult.getMatchedCount(),
+                                    updateResult.getModifiedCount()
+                            ))
                             .then();
                 })
-                .doOnSuccess(v -> log.info("Successfully updated seat statuses for session {}", sessionId))
                 .doOnError(e -> log.error("Error updating seat status in MongoDB: {}", e.getMessage()))
                 .onErrorResume(e -> {
                     log.error("Failed to update seat status in MongoDB, will continue with SSE update", e);
