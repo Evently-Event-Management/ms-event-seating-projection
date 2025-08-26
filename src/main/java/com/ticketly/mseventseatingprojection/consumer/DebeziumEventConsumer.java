@@ -37,7 +37,9 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.organizations",
             "dbz.ticketly.public.categories",
             "dbz.ticketly.public.event_cover_photos"
-    })
+    },
+            containerFactory = "debeziumListenerContainerFactory"
+    )
     public void onDebeziumEvent(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) throws Exception {
         String topic = record.topic();
         String payload = record.value();

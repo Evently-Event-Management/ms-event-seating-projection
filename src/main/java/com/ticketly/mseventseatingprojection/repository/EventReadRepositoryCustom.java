@@ -42,5 +42,5 @@ public interface EventReadRepositoryCustom {
      */
     Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId);
 
-    public Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate);
+    Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate);
 }
