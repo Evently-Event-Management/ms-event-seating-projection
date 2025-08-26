@@ -43,4 +43,17 @@ public class SeatStatusConsumer {
             // Do not acknowledge, let Kafka retry
         }
     }
+
+    @KafkaListener(topics = "ticketly.seats.booked")
+    public void onSeatsBooked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
+        log.info("Received SeatsBooked event for session: {}", payload.sessionId());
+        try {
+            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seatIds(), ReadModelSeatStatus.BOOKED);
+            sseService.publish(update, payload.sessionId());
+            acknowledgment.acknowledge();
+        } catch (Exception e) {
+            log.error("Error processing SeatsBooked event for session {}: {}", payload.sessionId(), e.getMessage());
+            // Do not acknowledge, let Kafka retry
+        }
+    }
 }
