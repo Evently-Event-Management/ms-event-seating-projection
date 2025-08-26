@@ -50,6 +50,7 @@ public class EventProjectionMapper {
                 .startTime(dto.getStartTime().toInstant())
                 .endTime(dto.getEndTime().toInstant())
                 .status(dto.getSessionStatus())
+                .salesStartTime(dto.getSalesStartTime().toInstant())
                 .sessionType(dto.getSessionType())
                 .layoutData(fromSeatingMap(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))
