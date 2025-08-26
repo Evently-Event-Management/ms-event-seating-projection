@@ -18,6 +18,7 @@ public class SessionInfoDTO {
     private String id;
     private Instant startTime;
     private Instant endTime;
+    private Instant salesStartTime;
     private SessionStatus status;
     private SessionType sessionType;
     private VenueDetailsInfo venueDetails;

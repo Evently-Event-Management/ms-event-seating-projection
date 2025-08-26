@@ -272,6 +272,7 @@ public class EventQueryService {
                 .status(session.getStatus())
                 .sessionType(session.getSessionType())
                 .venueDetails(venueDetailsDTO)
+                .salesStartTime(session.getSalesStartTime())
                 .build();
     }
 
