@@ -1,10 +1,14 @@
 package com.ticketly.mseventseatingprojection.service;
 
+import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationRequest;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
+import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
+import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +40,7 @@ public class EventQueryService {
                 dateFrom, dateTo, priceMin, priceMax, pageable
         ).map(eventPage -> eventPage.map(this::mapToThumbnailDTO));
     }
+
 
     /**
      * Validates if a list of seats for a given session are all available.
@@ -207,5 +212,108 @@ public class EventQueryService {
         // Simple city extraction logic, can be improved
         String[] parts = venue.getAddress().split(",");
         return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+    }
+
+    /**
+     * Fetches basic event info by event ID (excluding tiers and sessions).
+     *
+     * @param eventId The ID of the event.
+     * @return Mono emitting EventBasicInfoDTO or empty if not found.
+     */
+    public Mono<EventBasicInfoDTO> getBasicEventInfo(String eventId) {
+        return eventReadRepository.findEventById(eventId)
+                .map(event -> EventBasicInfoDTO.builder()
+                        .id(event.getId())
+                        .title(event.getTitle())
+                        .description(event.getDescription())
+                        .overview(event.getOverview())
+                        .coverPhotos(event.getCoverPhotos())
+                        .organization(event.getOrganization() != null ? EventBasicInfoDTO.OrganizationInfo.builder()
+                                .id(event.getOrganization().getId())
+                                .name(event.getOrganization().getName())
+                                .logoUrl(event.getOrganization().getLogoUrl())
+                                .build() : null)
+                        .category(event.getCategory() != null ? EventBasicInfoDTO.CategoryInfo.builder()
+                                .id(event.getCategory().getId())
+                                .name(event.getCategory().getName())
+                                .parentName(event.getCategory().getParentName())
+                                .build() : null)
+                        .tiers(event.getTiers() != null ? event.getTiers().stream()
+                                .map(tier -> EventBasicInfoDTO.TierInfo.builder()
+                                        .id(tier.getId())
+                                        .name(tier.getName())
+                                        .price(tier.getPrice())
+                                        .color(tier.getColor())
+                                        .build())
+                                .collect(Collectors.toList()) : Collections.emptyList())
+                        .build()).switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
+    }
+
+    public Mono<Page<SessionInfoDTO>> findSessionsByEventId(String eventId, Pageable pageable) {
+        return eventReadRepository.findSessionsByEventId(eventId, pageable)
+                .map(sessionPage -> sessionPage.map(this::mapToSessionInfoDTO));
+    }
+
+    private SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session) {
+        SessionInfoDTO.VenueDetailsInfo venueDetailsDTO = null;
+        if (session.getVenueDetails() != null) {
+            venueDetailsDTO = SessionInfoDTO.VenueDetailsInfo.builder()
+                    .name(session.getVenueDetails().getName())
+                    .address(session.getVenueDetails().getAddress())
+                    .onlineLink(session.getVenueDetails().getOnlineLink())
+                    .location(session.getVenueDetails().getLocation())
+                    .build();
+        }
+
+        return SessionInfoDTO.builder()
+                .id(session.getId())
+                .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
+                .status(session.getStatus())
+                .sessionType(session.getSessionType())
+                .venueDetails(venueDetailsDTO)
+                .salesStartTime(session.getSalesStartTime())
+                .build();
+    }
+
+    /**
+     * Fetches the seating map information for a specific session by its ID.
+     *
+     * @param sessionId The ID of the session
+     * @return A Mono emitting the seating map information or empty if not found
+     */
+    public Mono<SessionSeatingMapInfo> getSessionSeatingMap(String sessionId) {
+        return eventReadRepository.findSeatingMapBySessionId(sessionId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "sessionId", sessionId)));
+    }
+
+    /**
+     * Fetches sessions within a specific date range for a given event ID.
+     *
+     * @param eventId  The ID of the event.
+     * @param fromDate The start date of the range.
+     * @param toDate   The end date of the range.
+     * @return A Flux emitting the session information.
+     */
+    public Flux<SessionInfoDTO> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
+        return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
+                .map(this::mapToSessionInfoDTO);
+    }
+
+    /**
+     * Fetches a single session by its ID without the seating map layout data.
+     *
+     * @param sessionId The ID of the session to fetch.
+     * @return A Mono emitting the session information or empty if not found.
+     */
+    public Mono<SessionInfoDTO> getSessionById(String sessionId) {
+        return eventReadRepository.findEventBySessionId(sessionId)
+                .flatMap(eventDocument -> {
+                    // Find the specific session within the event document
+                    return Mono.justOrEmpty(eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst()
+                            .map(this::mapToSessionInfoDTO));
+                });
     }
 }

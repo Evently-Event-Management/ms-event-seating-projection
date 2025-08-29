@@ -8,6 +8,7 @@ import dto.projection.SeatingMapProjectionDTO;
 import dto.projection.SessionProjectionDTO;
 import dto.projection.TierInfo;
 import lombok.AllArgsConstructor;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -48,7 +49,8 @@ public class EventProjectionMapper {
                 .id(dto.getId().toString())
                 .startTime(dto.getStartTime().toInstant())
                 .endTime(dto.getEndTime().toInstant())
-                .status(dto.getStatus())
+                .status(dto.getSessionStatus())
+                .salesStartTime(dto.getSalesStartTime().toInstant())
                 .sessionType(dto.getSessionType())
                 .layoutData(fromSeatingMap(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))
@@ -120,7 +122,7 @@ public class EventProjectionMapper {
         return EventDocument.OrganizationInfo.builder()
                 .id(dto.getId().toString())
                 .name(dto.getName())
-                .logoUrl(dto.getLogoUrl())
+                .logoUrl(s3UrlGenerator.generatePublicUrl(dto.getLogoUrl()))
                 .build();
     }
 
@@ -145,18 +147,17 @@ public class EventProjectionMapper {
 
     private EventDocument.VenueDetailsInfo fromVenue(SessionProjectionDTO.VenueDetailsInfo dto) {
         if (dto == null) return null;
+        GeoJsonPoint location = null;
+
+        if (dto.getLatitude() != null && dto.getLongitude() != null) {
+            location = new GeoJsonPoint(dto.getLongitude(), dto.getLatitude());
+        }
+
         return EventDocument.VenueDetailsInfo.builder()
                 .name(dto.getName())
                 .address(dto.getAddress())
                 .onlineLink(dto.getOnlineLink())
-                .location(fromGeoJson(dto.getLocation()))
-                .build();
-    }
-
-    private EventDocument.GeoJsonPoint fromGeoJson(SessionProjectionDTO.GeoJsonPoint dto) {
-        if (dto == null) return null;
-        return EventDocument.GeoJsonPoint.builder()
-                .coordinates(dto.getCoordinates())
+                .location(location)
                 .build();
     }
 

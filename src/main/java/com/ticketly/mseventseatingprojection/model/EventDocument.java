@@ -3,11 +3,11 @@ package com.ticketly.mseventseatingprojection.model;
 import lombok.Builder;
 import lombok.Data;
 import model.EventStatus;
-import model.SeatStatus;
+import model.SessionStatus;
 import model.SessionType;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
-import org.springframework.data.mongodb.core.index.TextIndexed;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
+import org.springframework.data.mongodb.core.index.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -22,7 +22,8 @@ public class EventDocument {
     @Id
     private String id;
 
-    @TextIndexed
+    @TextIndexed(weight = 5.0f)
+    @Indexed
     private String title;
     private EventStatus status;
 
@@ -66,10 +67,12 @@ public class EventDocument {
     @Data
     @Builder
     public static class SessionInfo {
+        @Indexed
         private String id;
         private Instant startTime;
         private Instant endTime;
-        private String status;
+        private Instant salesStartTime;
+        private SessionStatus status;
         private SessionType sessionType;
         private VenueDetailsInfo venueDetails;
         private SessionSeatingMapInfo layoutData;
@@ -81,15 +84,8 @@ public class EventDocument {
         private String name;
         private String address;
         private String onlineLink;
-        @GeoSpatialIndexed
+        @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)
         private GeoJsonPoint location;
-    }
-
-    @Data
-    @Builder
-    public static class GeoJsonPoint {
-        private final String type = "Point";
-        private double[] coordinates; // [longitude, latitude]
     }
 
     // ✅ NEW: Nested classes for the denormalized seating map

@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketly.mseventseatingprojection.dto.*;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
+import com.ticketly.mseventseatingprojection.service.EventProjectionClient;
 import com.ticketly.mseventseatingprojection.service.ProjectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.SessionStatus;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -36,7 +38,9 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.organizations",
             "dbz.ticketly.public.categories",
             "dbz.ticketly.public.event_cover_photos"
-    })
+    },
+            containerFactory = "debeziumListenerContainerFactory"
+    )
     public void onDebeziumEvent(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) throws Exception {
         String topic = record.topic();
         String payload = record.value();
@@ -103,7 +107,7 @@ public class DebeziumEventConsumer {
             UUID eventId = UUID.fromString(message.path("before").path("id").asText());
             projectorService.deleteEvent(eventId)
                     .doOnSuccess(v -> future.complete(null))
-                    .doOnError(future::completeExceptionally)
+                    .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
@@ -112,12 +116,12 @@ public class DebeziumEventConsumer {
         if ("APPROVED".equals(eventChange.getStatus())) {
             projectorService.projectFullEvent(eventChange.getId())
                     .doOnSuccess(v -> future.complete(null))
-                    .doOnError(future::completeExceptionally)
+                    .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
         } else {
             projectorService.deleteEvent(eventChange.getId())
                     .doOnSuccess(v -> future.complete(null))
-                    .doOnError(future::completeExceptionally)
+                    .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
         }
     }
@@ -136,7 +140,7 @@ public class DebeziumEventConsumer {
                     if (exists) {
                         return projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId())
                                 .doOnSuccess(v -> future.complete(null))
-                                .doOnError(future::completeExceptionally)
+                                .doOnError(e -> handleProjectionError(e, future))
                                 .then(Mono.empty());
                     } else {
                         // No event exists, we can safely complete the future
@@ -170,20 +174,23 @@ public class DebeziumEventConsumer {
                     }
 
                     Mono<Void> projectionMono;
-                    if ("ON_SALE".equals(session.getStatus())) {
+                    if (SessionStatus.ON_SALE.equals(session.getStatus())) {
                         projectionMono = projectorService.projectSeatingMapPatch(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId(),
                                 mapChange.getLayoutData());
-                    } else {
+                    } else if (SessionStatus.SCHEDULED.equals(session.getStatus())) {
                         projectionMono = projectorService.projectSessionUpdate(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId());
+                    } else {
+                        future.complete(null);
+                        return;
                     }
 
                     projectionMono
                             .doOnSuccess(v -> future.complete(null))
-                            .doOnError(future::completeExceptionally)
+                            .doOnError(e -> handleProjectionError(e, future))
                             .subscribe();
                 })
                 .doFinally(signalType -> {
@@ -203,7 +210,7 @@ public class DebeziumEventConsumer {
             String orgId = message.path("before").path("id").asText();
             projectorService.deleteOrganization(orgId)
                     .doOnSuccess(v -> future.complete(null))
-                    .doOnError(future::completeExceptionally)
+                    .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
@@ -211,7 +218,7 @@ public class DebeziumEventConsumer {
         OrganizationChangePayload orgChange = objectMapper.treeToValue(message.path("after"), OrganizationChangePayload.class);
         projectorService.projectOrganizationChange(orgChange)
                 .doOnSuccess(v -> future.complete(null))
-                .doOnError(future::completeExceptionally)
+                .doOnError(e -> handleProjectionError(e, future))
                 .subscribe();
     }
 
@@ -223,17 +230,15 @@ public class DebeziumEventConsumer {
             String catId = message.path("before").path("id").asText();
             projectorService.deleteCategory(catId)
                     .doOnSuccess(v -> future.complete(null))
-                    .doOnError(future::completeExceptionally)
+                    .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
 
-        // For create ('c') or update ('u'), the logic is the same:
-        // Treat the event as a signal and fetch the complete, denormalized data.
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
         projectorService.projectCategoryChange(catChange.getId())
                 .doOnSuccess(v -> future.complete(null))
-                .doOnError(future::completeExceptionally)
+                .doOnError(e -> handleProjectionError(e, future))
                 .subscribe();
     }
 
@@ -264,13 +269,13 @@ public class DebeziumEventConsumer {
                             log.info("Projecting cover photo addition for event ID: {}", photoChange.getEventId());
                             return projectorService.projectCoverPhotoAdded(photoChange.getEventId(), photoChange.getPhotoUrl())
                                     .doOnSuccess(v -> future.complete(null))
-                                    .doOnError(future::completeExceptionally)
+                                    .doOnError(e -> handleProjectionError(e, future))
                                     .then(Mono.empty());
                         } else { // 'd' for delete
                             log.info("Projecting cover photo removal for event ID: {}", photoChange.getEventId());
                             return projectorService.projectCoverPhotoRemoved(photoChange.getEventId(), photoChange.getPhotoUrl())
                                     .doOnSuccess(v -> future.complete(null))
-                                    .doOnError(future::completeExceptionally)
+                                    .doOnError(e -> handleProjectionError(e, future))
                                     .then(Mono.empty());
                         }
                     } else {
@@ -280,5 +285,21 @@ public class DebeziumEventConsumer {
                     }
                 })
                 .subscribe();
+    }
+
+    private void handleProjectionError(Throwable error, CompletableFuture<?> future) {
+        if (error instanceof EventProjectionClient.ProjectionClientException pce &&
+                pce.getErrorType() == EventProjectionClient.ProjectionClientException.ErrorType.NOT_FOUND) {
+
+            // This is a 404 Not Found error. Treat it as a success.
+            log.warn("Resource not found during projection for topic '{}', which is expected during a rebuild. Acknowledging and skipping message. Details: {}",
+                    "events", error.getMessage());
+            future.complete(null); // Complete the future successfully
+        } else {
+            // For all other errors, complete exceptionally to trigger a retry.
+            log.error("A non-recoverable error occurred during projection for topic '{}'. The message will be retried.",
+                    "events", error);
+            future.completeExceptionally(error);
+        }
     }
 }
