@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -83,22 +84,28 @@ public class EventProjectionClient {
         ProjectionClientException.ErrorType errorType;
 
         if (error instanceof WebClientResponseException responseException) {
-            HttpStatus status = (HttpStatus) responseException.getStatusCode();
-
-            if (status.is4xxClientError()) {
-                if (status == HttpStatus.UNAUTHORIZED) {
-                    message = "Authentication failed with status 401";
-                    errorType = ProjectionClientException.ErrorType.AUTHENTICATION;
-                } else if (status == HttpStatus.NOT_FOUND) {
-                    message = "Resource not found with status 404";
-                    errorType = ProjectionClientException.ErrorType.NOT_FOUND;
-                } else {
-                    message = "Client error with status " + status.value();
-                    errorType = ProjectionClientException.ErrorType.CLIENT_ERROR;
-                }
+            // NEW: Check for the specific buffer limit exception first
+            if (responseException.getCause() instanceof DataBufferLimitException) {
+                message = "Response size exceeds buffer limit";
+                errorType = ProjectionClientException.ErrorType.RESPONSE_TOO_LARGE_ERROR;
             } else {
-                message = "Server error with status " + status.value();
-                errorType = ProjectionClientException.ErrorType.SERVER_ERROR;
+                // Original logic for other response exceptions
+                HttpStatus status = (HttpStatus) responseException.getStatusCode();
+                if (status.is4xxClientError()) {
+                    if (status == HttpStatus.UNAUTHORIZED) {
+                        message = "Authentication failed with status 401";
+                        errorType = ProjectionClientException.ErrorType.AUTHENTICATION;
+                    } else if (status == HttpStatus.NOT_FOUND) {
+                        message = "Resource not found with status 404";
+                        errorType = ProjectionClientException.ErrorType.NOT_FOUND;
+                    } else {
+                        message = "Client error with status " + status.value();
+                        errorType = ProjectionClientException.ErrorType.CLIENT_ERROR;
+                    }
+                } else {
+                    message = "Server error with status " + status.value();
+                    errorType = ProjectionClientException.ErrorType.SERVER_ERROR;
+                }
             }
         } else if (error instanceof WebClientRequestException) {
             Throwable cause = error.getCause();
@@ -134,6 +141,7 @@ public class EventProjectionClient {
             NOT_FOUND,
             CLIENT_ERROR,
             SERVER_ERROR,
+            RESPONSE_TOO_LARGE_ERROR,
             UNKNOWN
         }
 

@@ -245,6 +245,9 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Project only necessary fields for SessionInfoDTO
         AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails", "salesStartTime");
 
+        // Sort by startTime in ascending order
+        AggregationOperation sortByStartTime = Aggregation.sort(Sort.by(Sort.Direction.ASC, "startTime"));
+
         // Build the aggregation pipeline
         TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(
                 EventDocument.SessionInfo.class,
@@ -252,7 +255,8 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 unwindSessions,
                 matchDateRange,
                 replaceRoot,
-                projectFields
+                projectFields,
+                sortByStartTime
         );
 
         // Execute the aggregation and return the results
@@ -260,4 +264,3 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     }
 
 }
-
