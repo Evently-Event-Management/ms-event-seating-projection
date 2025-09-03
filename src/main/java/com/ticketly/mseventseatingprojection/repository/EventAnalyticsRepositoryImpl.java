@@ -1,8 +1,9 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.analytics.SessionSummaryDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.TierSalesDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
@@ -67,6 +68,54 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
     @Override
     public Mono<EventOverallStatsDTO> getEventOverallStats(String eventId) {
+        AggregationOperation calculateStatsOperation = context -> Document.parse("""
+                    {
+                        "$group": {
+                            "_id": null,
+                            "totalRevenue": {
+                                "$sum": {
+                                    "$cond": [
+                                        { "$eq": ["$status", "BOOKED"] },
+                                        { "$toDecimal": "$tier.price" },
+                                        0
+                                    ]
+                                }
+                            },
+                            "totalTicketsSold": {
+                                "$sum": {
+                                    "$cond": [
+                                        { "$eq": ["$status", "BOOKED"] },
+                                        1,
+                                        0
+                                    ]
+                                }
+                            },
+                            "totalEventCapacity": { "$sum": 1 }
+                        }
+                    }
+                """);
+
+        AggregationOperation calculateDerivedMetrics = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "averageRevenuePerTicket": {
+                                "$cond": [
+                                    { "$gt": ["$totalTicketsSold", 0] },
+                                    { "$divide": ["$totalRevenue", "$totalTicketsSold"] },
+                                    0
+                                ]
+                            },
+                            "overallSellOutPercentage": {
+                                "$cond": [
+                                    { "$gt": ["$totalEventCapacity", 0] },
+                                    { "$multiply": [{ "$divide": ["$totalTicketsSold", "$totalEventCapacity"] }, 100] },
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                """);
+
         Aggregation aggregation = newAggregation(
                 match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
@@ -75,21 +124,96 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
-                group()
-                        .sum(
-                                ConditionalOperators.when(Criteria.where("status").is("BOOKED"))
-                                        .then(ConvertOperators.Convert.convertValue("$tier.price").to("decimal"))
-                                        .otherwise(0)
-                        ).as("totalRevenue")
-                        .sum(
-                                ConditionalOperators.when(Criteria.where("status").is("BOOKED")).then(1).otherwise(0)
-                        ).as("totalTicketsSold")
-                        .count().as("totalEventCapacity")
+                calculateStatsOperation,
+                calculateDerivedMetrics
         );
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", EventOverallStatsDTO.class)
                 .next()
                 .defaultIfEmpty(new EventOverallStatsDTO());
+    }
+
+    @Override
+    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
+        // Define the complex stages using native JSON for clarity and correctness
+        AggregationOperation unifySeatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "unifiedSeats": {
+                                "$reduce": {
+                                    "input": "$sessions.layoutData.layout.blocks",
+                                    "initialValue": [],
+                                    "in": { "$concatArrays": [ "$$value", { "$ifNull": ["$$this.seats", []] }, { "$ifNull": [ { "$reduce": { "input": "$$this.rows.seats", "initialValue": [], "in": { "$concatArrays": ["$$value", "$$this"] }}}, [] ]} ] }
+                                }
+                            }
+                        }
+                    }
+                """);
+
+        AggregationOperation calculateStatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "sessionCapacity": { "$size": "$unifiedSeats" },
+                            "bookedSeats": {
+                                "$filter": { "input": "$unifiedSeats", "as": "seat", "cond": { "$eq": ["$$seat.status", "BOOKED"] } }
+                            }
+                        }
+                    }
+                """);
+
+        AggregationOperation calculateFinalMetricsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "ticketsSold": { "$size": "$bookedSeats" },
+                            "sessionRevenue": { "$sum": { "$map": { "input": "$bookedSeats", "as": "seat", "in": { "$toDecimal": "$$seat.tier.price" } } } }
+                        }
+                    }
+                """);
+
+        // Add the sellOutPercentage directly as a Document stage
+        AggregationOperation calculateSellOutPercentage = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "sellOutPercentage": {
+                                "$cond": [
+                                    { "$gt": ["$sessionCapacity", 0] },
+                                    { "$multiply": [{ "$divide": ["$ticketsSold", "$sessionCapacity"] }, 100] },
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                """);
+
+        // Final projection without complex expressions
+        AggregationOperation finalProjection = context -> Document.parse("""
+                     {
+                         "$project": {
+                             "sessionId": "$sessions._id",
+                             "eventId": "$_id",
+                             "eventTitle": "$title",
+                             "startTime": "$sessions.startTime",
+                             "endTime": "$sessions.endTime",
+                             "sessionStatus": "$sessions.status",
+                             "sessionCapacity": 1,
+                             "ticketsSold": 1,
+                             "sessionRevenue": 1,
+                             "sellOutPercentage": 1
+                         }
+                     }
+                \s""");
+
+        Aggregation aggregation = newAggregation(
+                match(Criteria.where("_id").is(eventId)),
+                unwind("sessions"),
+                unifySeatsOperation,
+                calculateStatsOperation,
+                calculateFinalMetricsOperation,
+                calculateSellOutPercentage,
+                finalProjection
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", SessionSummaryDTO.class);
     }
 
     @Override
@@ -104,7 +228,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     }
 
     @Override
-    public Flux<TierAnalyticsDTO> getTierAnalytics(String eventId) {
+    public Flux<TierSalesDTO> getTierAnalytics(String eventId) {
         Aggregation aggregation = newAggregation(
                 match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
@@ -131,9 +255,20 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                         .and("tierCapacity").as("tierCapacity")
                         .and("ticketsSold").as("ticketsSold")
                         .and("totalRevenue").as("totalRevenue")
+                        .and(
+                                ConditionalOperators.when(Criteria.where("tierCapacity").gt(0))
+                                        .thenValueOf(
+                                                ArithmeticOperators.Multiply.valueOf(
+                                                        ArithmeticOperators.Divide.valueOf("ticketsSold").divideBy("tierCapacity")
+                                                ).multiplyBy(100)
+                                        )
+                                        .otherwise(0)
+                        ).as("percentageOfTotalSales")
                         .andExclude("_id")
         );
 
-        return reactiveMongoTemplate.aggregate(aggregation, "events", TierAnalyticsDTO.class);
+        return reactiveMongoTemplate.aggregate(aggregation, "events", TierSalesDTO.class);
     }
+
+
 }

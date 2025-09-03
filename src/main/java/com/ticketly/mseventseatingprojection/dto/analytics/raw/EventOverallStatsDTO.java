@@ -18,5 +18,7 @@ public class EventOverallStatsDTO {
     private BigDecimal totalRevenue;
     private Integer totalTicketsSold;
     private Integer totalEventCapacity;
+    private BigDecimal averageRevenuePerTicket;
+    private Double overallSellOutPercentage;
 }
 

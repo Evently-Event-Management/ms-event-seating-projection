@@ -1,8 +1,9 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.analytics.SessionSummaryDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.TierSalesDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,6 +15,7 @@ public interface EventAnalyticsRepository {
 
     /**
      * Find complete event document with all sessions and seating data for analytics
+     *
      * @param eventId The ID of the event to analyze
      * @return A Mono containing the complete event document
      */
@@ -21,7 +23,8 @@ public interface EventAnalyticsRepository {
 
     /**
      * Find a specific session with complete seating data for analytics
-     * @param eventId The ID of the event
+     *
+     * @param eventId   The ID of the event
      * @param sessionId The ID of the session to analyze
      * @return A Mono containing the event document with the specified session
      */
@@ -29,6 +32,7 @@ public interface EventAnalyticsRepository {
 
     /**
      * Get overall event statistics using aggregation
+     *
      * @param eventId The ID of the event to analyze
      * @return A Mono containing the overall event statistics
      */
@@ -36,6 +40,7 @@ public interface EventAnalyticsRepository {
 
     /**
      * Get session status counts for an event using aggregation
+     *
      * @param eventId The ID of the event to analyze
      * @return A Flux containing the count of sessions by status
      */
@@ -43,16 +48,26 @@ public interface EventAnalyticsRepository {
 
     /**
      * Get tier-based sales analytics for an event using aggregation
+     *
      * @param eventId The ID of the event to analyze
      * @return A Flux containing tier analytics data
      */
-    Flux<TierAnalyticsDTO> getTierAnalytics(String eventId);
+    Flux<TierSalesDTO> getTierAnalytics(String eventId);
 
     /**
      * Find only the event title by event ID
+     *
      * @param eventId The ID of the event
      * @return A Mono containing the event document with only the title field
      */
     Mono<EventDocument> findEventTitleById(String eventId);
 
+
+    /**
+     * Get summaries for all sessions of an event using aggregation
+     *
+     * @param eventId The ID of the event to analyze
+     * @return A Flux containing summaries for all sessions
+     */
+    Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId);
 }

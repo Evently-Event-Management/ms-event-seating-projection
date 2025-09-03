@@ -3,7 +3,6 @@ package com.ticketly.mseventseatingprojection.service;
 import com.ticketly.mseventseatingprojection.dto.analytics.*;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
@@ -41,7 +40,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
         Flux<SessionStatusCountDTO> sessionStatusCountsFlux = eventAnalyticsRepository.getSessionStatusCounts(eventId);
 
         // Get tier analytics using aggregation
-        Flux<TierAnalyticsDTO> tierAnalyticsFlux = eventAnalyticsRepository.getTierAnalytics(eventId);
+        Flux<TierSalesDTO> tierAnalyticsFlux = eventAnalyticsRepository.getTierAnalytics(eventId);
 
         // Combine all results to build the final DTO
         return Mono.zip(
@@ -54,52 +53,30 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                     String eventTitle = tuple.getT1();
                     EventOverallStatsDTO stats = tuple.getT2();
                     Map<SessionStatus, Integer> sessionStatusCounts = tuple.getT3();
-                    List<TierAnalyticsDTO> tierAnalytics = tuple.getT4();
-
-                    // Calculate average revenue per ticket
-                    BigDecimal averageRevenuePerTicket = stats.getTotalTicketsSold() > 0
-                            ? stats.getTotalRevenue().divide(BigDecimal.valueOf(stats.getTotalTicketsSold()), 2, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-
-                    // Calculate overall sell-out percentage
-                    double overallSellOutPercentage = stats.getTotalEventCapacity() > 0
-                            ? (double) stats.getTotalTicketsSold() / stats.getTotalEventCapacity() * 100
-                            : 0.0;
-
-                    // Convert tier analytics to TierSalesDTO
-                    List<TierSalesDTO> salesByTier = tierAnalytics.stream()
-                            .map(tier -> {
-                                double percentage = stats.getTotalTicketsSold() > 0
-                                        ? (double) tier.getTicketsSold() / stats.getTotalTicketsSold() * 100
-                                        : 0.0;
-
-                                return TierSalesDTO.builder()
-                                        .tierId(tier.getTierId())
-                                        .tierName(tier.getTierName())
-                                        .tierColor(tier.getTierColor())
-                                        .ticketsSold(tier.getTicketsSold())
-                                        .tierCapacity(tier.getTierCapacity())
-                                        .totalRevenue(tier.getTotalRevenue())
-                                        .percentageOfTotalSales(percentage)
-                                        .build();
-                            })
-                            .collect(Collectors.toList());
+                    List<TierSalesDTO> tierAnalytics = tuple.getT4();
 
                     // Build and return the final DTO
                     return EventAnalyticsDTO.builder()
                             .eventId(eventId)
                             .eventTitle(eventTitle)
                             .totalRevenue(stats.getTotalRevenue())
-                            .averageRevenuePerTicket(averageRevenuePerTicket)
+                            .averageRevenuePerTicket(stats.getAverageRevenuePerTicket())
                             .totalTicketsSold(stats.getTotalTicketsSold())
                             .totalEventCapacity(stats.getTotalEventCapacity())
-                            .overallSellOutPercentage(overallSellOutPercentage)
+                            .overallSellOutPercentage(stats.getOverallSellOutPercentage())
                             .sessionStatusBreakdown(sessionStatusCounts)
-                            .salesByTier(salesByTier)
+                            .salesByTier(tierAnalytics)
                             .build();
                 })
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
+
+    @Override
+    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
+        return eventAnalyticsRepository.getAllSessionsAnalytics(eventId)
+                .switchIfEmpty(Flux.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
+    }
+
 
     @Override
     public Mono<SessionAnalyticsDTO> getSessionAnalytics(String eventId, String sessionId) {
@@ -117,19 +94,6 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                 })
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
-
-    @Override
-    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
-        return eventAnalyticsRepository.findEventWithCompleteSeatingData(eventId)
-                .flatMapMany(event -> {
-                    List<SessionSummaryDTO> sessionSummaries = event.getSessions().stream()
-                            .map(session -> calculateSessionSummary(event, session))
-                            .collect(Collectors.toList());
-                    return Flux.fromIterable(sessionSummaries);
-                })
-                .switchIfEmpty(Flux.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
-    }
-
 
     /**
      * Calculate analytics for a specific session
@@ -230,56 +194,6 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
     }
 
     /**
-     * Calculate basic analytics summary for a session
-     */
-    private SessionSummaryDTO calculateSessionSummary(EventDocument event, EventDocument.SessionInfo session) {
-        // Initialize metrics
-        BigDecimal sessionRevenue = BigDecimal.ZERO;
-        int ticketsSold = 0;
-        int sessionCapacity = 0;
-
-        // Process seating layout if available
-        if (session.getLayoutData() != null && session.getLayoutData().getLayout() != null) {
-            for (EventDocument.BlockInfo block : session.getLayoutData().getLayout().getBlocks()) {
-                // Process seats in rows
-                if (block.getRows() != null) {
-                    for (EventDocument.RowInfo row : block.getRows()) {
-                        if (row.getSeats() != null) {
-                            sessionCapacity += row.getSeats().size();
-                            ticketsSold += countBookedSeats(row.getSeats());
-                            sessionRevenue = sessionRevenue.add(calculateRevenueFromSeats(row.getSeats()));
-                        }
-                    }
-                }
-
-                // Process seats directly in block (for standing areas)
-                if (block.getSeats() != null) {
-                    sessionCapacity += block.getSeats().size();
-                    ticketsSold += countBookedSeats(block.getSeats());
-                    sessionRevenue = sessionRevenue.add(calculateRevenueFromSeats(block.getSeats()));
-                }
-            }
-        }
-
-        // Calculate sell-out percentage
-        double sellOutPercentage = sessionCapacity > 0 ? (double) ticketsSold / sessionCapacity * 100 : 0.0;
-
-        // Build and return the session summary DTO
-        return SessionSummaryDTO.builder()
-                .sessionId(session.getId())
-                .eventId(event.getId())
-                .eventTitle(event.getTitle())
-                .startTime(session.getStartTime())
-                .endTime(session.getEndTime())
-                .sessionRevenue(sessionRevenue)
-                .ticketsSold(ticketsSold)
-                .sessionStatus(session.getStatus())
-                .sessionCapacity(sessionCapacity)
-                .sellOutPercentage(sellOutPercentage)
-                .build();
-    }
-
-    /**
      * Process a list of seats and update the tier sales tracking map
      */
     private void processSeatsList(List<EventDocument.SeatInfo> seats,
@@ -351,6 +265,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                             .tierName(dto.getTierName())
                             .tierColor(dto.getTierColor())
                             .ticketsSold(dto.getTicketsSold())
+                            .tierCapacity(dto.getTierCapacity())
                             .totalRevenue(dto.getTotalRevenue())
                             .percentageOfTotalSales(percentage)
                             .build();
