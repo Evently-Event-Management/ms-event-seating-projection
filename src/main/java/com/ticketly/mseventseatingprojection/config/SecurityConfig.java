@@ -24,6 +24,7 @@ public class SecurityConfig {
                                 "/v1/events/**",
                                 "/v1/categories/**",
                                 "/v1/sessions/**",
+                                "/v1/analytics/**",
                                 "/v1/sse/**",
                                 "/oauth2/**"
                         ).permitAll()

@@ -284,7 +284,7 @@ public class EventQueryService {
      */
     public Mono<SessionSeatingMapInfo> getSessionSeatingMap(String sessionId) {
         return eventReadRepository.findSeatingMapBySessionId(sessionId)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "sessionId", sessionId)));
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "session_id", sessionId)));
     }
 
     /**

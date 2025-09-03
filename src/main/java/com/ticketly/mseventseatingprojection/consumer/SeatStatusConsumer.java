@@ -23,63 +23,63 @@ public class SeatStatusConsumer {
 
     @KafkaListener(topics = "ticketly.seats.locked")
     public void onSeatsLocked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsLocked event for session: {}", payload.sessionId());
+        log.info("Received SeatsLocked event for session: {}", payload.session_id());
         try {
             // Create update DTO for SSE
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seatIds(), ReadModelSeatStatus.LOCKED);
+            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.LOCKED);
 
             // Update MongoDB first, then publish SSE event
-            seatStatusService.updateSeatStatus(payload.sessionId(), payload.seatIds(), ReadModelSeatStatus.LOCKED)
+            seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.LOCKED)
                     .doOnSuccess(v -> log.info("Successfully updated seat status to LOCKED in MongoDB"))
                     .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
                     .onErrorResume(e -> Mono.empty()) // Continue with SSE even if MongoDB update fails
                     .then(Mono.fromRunnable(() -> {
                         // Publish SSE event
-                        sseService.publish(update, payload.sessionId());
+                        sseService.publish(update, payload.session_id());
                         acknowledgment.acknowledge();
                     }))
                     .subscribe();
         } catch (Exception e) {
-            log.error("Error processing SeatsLocked event for session {}: {}", payload.sessionId(), e.getMessage());
+            log.error("Error processing SeatsLocked event for session {}: {}", payload.session_id(), e.getMessage());
             // Do not acknowledge, let Kafka retry
         }
     }
 
     @KafkaListener(topics = "ticketly.seats.released")
     public void onSeatsReleased(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsReleased event for session: {}", payload.sessionId());
+        log.info("Received SeatsReleased event for session: {}", payload.session_id());
         try {
             // Create update DTO for SSE
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seatIds(), ReadModelSeatStatus.AVAILABLE);
+            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.AVAILABLE);
 
             // Update MongoDB first, then publish SSE event
-            seatStatusService.updateSeatStatus(payload.sessionId(), payload.seatIds(), ReadModelSeatStatus.AVAILABLE)
+            seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.AVAILABLE)
                     .doOnSuccess(v -> log.info("Successfully updated seat status to AVAILABLE in MongoDB"))
                     .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
                     .onErrorResume(e -> Mono.empty()) // Continue with SSE even if MongoDB update fails
                     .then(Mono.fromRunnable(() -> {
                         // Publish SSE event
-                        sseService.publish(update, payload.sessionId());
+                        sseService.publish(update, payload.session_id());
                         acknowledgment.acknowledge();
                     }))
                     .subscribe();
         } catch (Exception e) {
-            log.error("Error processing SeatsReleased event for session {}: {}", payload.sessionId(), e.getMessage());
+            log.error("Error processing SeatsReleased event for session {}: {}", payload.session_id(), e.getMessage());
             // Do not acknowledge, let Kafka retry
         }
     }
 
     @KafkaListener(topics = "ticketly.seats.booked")
     public void onSeatsBooked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsBooked event for session: {}", payload.sessionId());
+        log.info("Received SeatsBooked event for session: {}", payload.session_id());
         try {
             // Only publish SSE event for booked seats, no MongoDB update as per requirement
             // This will be handled by CQRS projection
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seatIds(), ReadModelSeatStatus.BOOKED);
-            sseService.publish(update, payload.sessionId());
+            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.BOOKED);
+            sseService.publish(update, payload.session_id());
             acknowledgment.acknowledge();
         } catch (Exception e) {
-            log.error("Error processing SeatsBooked event for session {}: {}", payload.sessionId(), e.getMessage());
+            log.error("Error processing SeatsBooked event for session {}: {}", payload.session_id(), e.getMessage());
             // Do not acknowledge, let Kafka retry
         }
     }

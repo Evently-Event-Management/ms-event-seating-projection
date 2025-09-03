@@ -5,7 +5,7 @@ import java.util.UUID;
 
 // Using a record for an immutable, concise DTO
 public record SeatStatusChangeEventDto(
-        UUID sessionId,
-        List<UUID> seatIds
+        UUID session_id,
+        List<UUID> seat_ids
 ) {
 }
