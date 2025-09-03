@@ -6,6 +6,7 @@ import com.ticketly.mseventseatingprojection.dto.analytics.TierSalesDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SeatStatusCountDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
+import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
@@ -249,7 +250,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", SessionSummaryDTO.class)
                 .next()
-                .switchIfEmpty(Mono.error(new RuntimeException("Session not found or has no data")));
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session not found or has no data")));
     }
 
     @Override
