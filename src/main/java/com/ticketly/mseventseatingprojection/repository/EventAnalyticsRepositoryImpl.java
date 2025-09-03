@@ -269,7 +269,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     }
 
     public Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId) {
-        return getTierAnalyticsInternal(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId));
+        return getTierAnalyticsInternal(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId));
     }
 
     /**
@@ -324,7 +324,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     @Override
     public Flux<SeatStatusCountDTO> getSessionStatusCounts(String eventId, String sessionId) {
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
+                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
                 unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
@@ -392,16 +392,12 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 """);
 
         Aggregation aggregation = newAggregation(
-                // Match the specific event and session
                 match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
                 match(Criteria.where("sessions._id").is(sessionId)),
-                // Unwind blocks to process them individually
                 unwind("sessions.layoutData.layout.blocks"),
-                // Calculate stats for each block
                 unifyBlockSeatsOperation,
                 calculateBlockStatsOperation,
-                // Project to the final DTO shape
                 projectBlockOccupancyOperation
         );
 

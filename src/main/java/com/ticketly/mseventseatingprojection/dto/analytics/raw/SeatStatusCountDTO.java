@@ -1,11 +1,11 @@
 package com.ticketly.mseventseatingprojection.dto.analytics.raw;
 
 
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import model.SessionStatus;
 
 /**
  * DTO for session status counts from aggregation
@@ -15,6 +15,6 @@ import model.SessionStatus;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SeatStatusCountDTO {
-    private SessionStatus status;
+    private ReadModelSeatStatus status;
     private Integer count;
 }
