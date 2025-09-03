@@ -1,21 +1,25 @@
 package com.ticketly.mseventseatingprojection.dto.analytics;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 /**
- * DTO representing sales analytics for a specific ticket tier
+ * DTO for tier-based analytics from aggregation
  */
 @Data
 @Builder
-public class TierSalesDTO {
+@NoArgsConstructor
+@AllArgsConstructor
+public class TierAnalyticsDTO {
     private String tierId;
     private String tierName;
     private String tierColor;
-    private Integer ticketsSold;
-    private Integer tierCapacity;
     private BigDecimal totalRevenue;
-    private Double percentageOfTotalSales;
+    private Integer tierCapacity;
+    private Integer ticketsSold;
 }
+
