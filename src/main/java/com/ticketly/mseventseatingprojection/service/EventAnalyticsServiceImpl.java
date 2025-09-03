@@ -5,8 +5,8 @@ import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventAnalyticsRepository;
-import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
+import model.SessionStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -70,16 +70,14 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
         int totalEventCapacity = 0;
 
         // Session status counts
-        Map<String, Integer> sessionStatusCounts = new HashMap<>();
+        Map<SessionStatus, Integer> sessionStatusCounts = new HashMap<>();
 
         // Tier sales tracking
         Map<String, TierSalesDTO.TierSalesDTOBuilder> tierSalesMap = new HashMap<>();
 
         // Process all sessions in the event
         for (EventDocument.SessionInfo session : event.getSessions()) {
-            // Count session by status
-            String statusKey = session.getStatus().toString();
-            sessionStatusCounts.put(statusKey, sessionStatusCounts.getOrDefault(statusKey, 0) + 1);
+            sessionStatusCounts.put(session.getStatus(), sessionStatusCounts.getOrDefault(session.getStatus(), 0) + 1);
 
             // Process seating data if available
             if (session.getLayoutData() != null && session.getLayoutData().getLayout() != null) {
@@ -145,7 +143,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
         int sessionCapacity = 0;
 
         // Seat status tracking
-        Map<String, Integer> seatStatusCounts = new HashMap<>();
+        Map<ReadModelSeatStatus, Integer> seatStatusCounts = new HashMap<>();
 
         // Tier sales tracking
         Map<String, TierSalesDTO.TierSalesDTOBuilder> tierSalesMap = new HashMap<>();
@@ -227,6 +225,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                 .sessionCapacity(sessionCapacity)
                 .sellOutPercentage(sellOutPercentage)
                 .salesByTier(salesByTier)
+                .sessionStatus(session.getStatus())
                 .seatStatusBreakdown(seatStatusCounts)
                 .occupancyByBlock(blockOccupancyList)
                 .build();
@@ -276,6 +275,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                 .endTime(session.getEndTime())
                 .sessionRevenue(sessionRevenue)
                 .ticketsSold(ticketsSold)
+                .sessionStatus(session.getStatus())
                 .sessionCapacity(sessionCapacity)
                 .sellOutPercentage(sellOutPercentage)
                 .build();
@@ -311,10 +311,9 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
     /**
      * Update the counts of seats by status
      */
-    private void updateSeatStatusCounts(List<EventDocument.SeatInfo> seats, Map<String, Integer> statusCounts) {
+    private void updateSeatStatusCounts(List<EventDocument.SeatInfo> seats, Map<ReadModelSeatStatus, Integer> statusCounts) {
         for (EventDocument.SeatInfo seat : seats) {
-            String statusKey = seat.getStatus().toString();
-            statusCounts.put(statusKey, statusCounts.getOrDefault(statusKey, 0) + 1);
+            statusCounts.put(seat.getStatus(), statusCounts.getOrDefault(seat.getStatus(), 0) + 1);
         }
     }
 

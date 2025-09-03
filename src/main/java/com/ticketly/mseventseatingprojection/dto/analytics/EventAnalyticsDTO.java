@@ -2,6 +2,7 @@ package com.ticketly.mseventseatingprojection.dto.analytics;
 
 import lombok.Builder;
 import lombok.Data;
+import model.SessionStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,7 +27,7 @@ public class EventAnalyticsDTO {
     private Double overallSellOutPercentage;
 
     // Session status overview
-    private Map<String, Integer> sessionStatusBreakdown;
+    private Map<SessionStatus, Integer> sessionStatusBreakdown;
 
     // Tier sales breakdown
     private List<TierSalesDTO> salesByTier;
