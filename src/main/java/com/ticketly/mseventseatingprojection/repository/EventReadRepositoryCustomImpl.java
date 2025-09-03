@@ -50,7 +50,6 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     }
 
     private Mono<Criteria> getCategoryCriteria(String categoryId) {
-        // This method remains unchanged.
         return categoryReadRepository.findByParentId(categoryId)
                 .collectList()
                 .map(subcategories -> {
@@ -122,7 +121,6 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         matchCriteriaList.add(Criteria.where("status").is("APPROVED"));
 
         // Add remaining match criteria as a single $match stage
-        // Removed redundant check: matchCriteriaList will always have at least the status criteria
         pipeline.add(Aggregation.match(new Criteria().andOperator(matchCriteriaList)));
 
         // Rest of the pipeline remains the same

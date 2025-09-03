@@ -25,7 +25,7 @@ public class SecurityConfig {
                                 "/v1/categories/**",
                                 "/v1/sessions/**",
                                 "/v1/sse/**",
-                                "/oauth2/**" // Add this path to support OAuth2 redirects
+                                "/oauth2/**"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )
