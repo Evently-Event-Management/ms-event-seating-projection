@@ -22,6 +22,7 @@ public class SessionSummaryDTO {
     private String eventTitle;
     private Instant startTime;
     private Instant endTime;
+    private Instant salesStartTime;
     private BigDecimal sessionRevenue;
     private Integer ticketsSold;
     private SessionStatus sessionStatus;

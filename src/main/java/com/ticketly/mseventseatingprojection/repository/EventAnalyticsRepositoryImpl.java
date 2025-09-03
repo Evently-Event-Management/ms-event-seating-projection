@@ -205,6 +205,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                              "startTime": "$sessions.startTime",
                              "endTime": "$sessions.endTime",
                              "sessionStatus": "$sessions.status",
+                             "salesStartTime": "$sessions.salesStartTime",
                              "sessionCapacity": 1,
                              "ticketsSold": 1,
                              "sessionRevenue": 1,
@@ -327,6 +328,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         Aggregation aggregation = newAggregation(
                 match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
+                match(Criteria.where("sessions._id").is(sessionId)),
                 unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),

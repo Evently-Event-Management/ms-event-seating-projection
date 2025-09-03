@@ -114,8 +114,8 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                             ? Duration.between(now, summaryDTO.getStartTime())
                             : Duration.ZERO;
 
-                    Duration salesWindowDuration = summaryDTO.getStartTime() != null && summaryDTO.getEndTime() != null
-                            ? Duration.between(summaryDTO.getStartTime(), summaryDTO.getEndTime())
+                    Duration salesWindowDuration = summaryDTO.getSalesStartTime() != null && summaryDTO.getStartTime() != null
+                            ? Duration.between(summaryDTO.getSalesStartTime(), summaryDTO.getStartTime())
                             : Duration.ZERO;
 
                     // Build and return the final DTO, using the builder from the parent class
@@ -126,12 +126,12 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                             .eventTitle(summaryDTO.getEventTitle())
                             .startTime(summaryDTO.getStartTime())
                             .endTime(summaryDTO.getEndTime())
+                            .salesStartTime(summaryDTO.getSalesStartTime())
                             .sessionRevenue(summaryDTO.getSessionRevenue())
                             .ticketsSold(summaryDTO.getTicketsSold())
                             .sessionStatus(summaryDTO.getSessionStatus())
                             .sessionCapacity(summaryDTO.getSessionCapacity())
                             .sellOutPercentage(summaryDTO.getSellOutPercentage())
-                            // Add the detailed analytics
                             .timeUntilStart(timeUntilStart)
                             .salesWindowDuration(salesWindowDuration)
                             .salesByTier(tierAnalytics)
