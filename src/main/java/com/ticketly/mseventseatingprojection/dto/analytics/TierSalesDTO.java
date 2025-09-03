@@ -15,6 +15,7 @@ public class TierSalesDTO {
     private String tierName;
     private String tierColor;
     private Integer ticketsSold;
+    private Integer tierCapacity;
     private BigDecimal totalRevenue;
     private Double percentageOfTotalSales;
 }

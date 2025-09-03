@@ -17,11 +17,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SessionSummaryDTO {
-    private String sessionId;
+    private String sessionId; //
     private String eventId;
     private String eventTitle;
     private Instant startTime;
     private Instant endTime;
+    private Instant salesStartTime;
     private BigDecimal sessionRevenue;
     private Integer ticketsSold;
     private SessionStatus sessionStatus;
