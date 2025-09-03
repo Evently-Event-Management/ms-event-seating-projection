@@ -1,8 +1,8 @@
 package com.ticketly.mseventseatingprojection.repository;
 
-import com.ticketly.mseventseatingprojection.dto.analytics.EventOverallStatsDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.SessionStatusCountDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.TierAnalyticsDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -47,4 +47,12 @@ public interface EventAnalyticsRepository {
      * @return A Flux containing tier analytics data
      */
     Flux<TierAnalyticsDTO> getTierAnalytics(String eventId);
+
+    /**
+     * Find only the event title by event ID
+     * @param eventId The ID of the event
+     * @return A Mono containing the event document with only the title field
+     */
+    Mono<EventDocument> findEventTitleById(String eventId);
+
 }

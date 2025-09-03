@@ -1,4 +1,4 @@
-package com.ticketly.mseventseatingprojection.dto.analytics;
+package com.ticketly.mseventseatingprojection.dto.analytics.raw;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

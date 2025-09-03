@@ -16,7 +16,7 @@ import java.time.Instant;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SessionSummaryDTO {
+public class SessionSummaryStatsDTO {
     private String sessionId; //
     private String eventId;
     private String eventTitle;
@@ -26,5 +26,4 @@ public class SessionSummaryDTO {
     private Integer ticketsSold;
     private SessionStatus sessionStatus;
     private Integer sessionCapacity;
-    private Double sellOutPercentage;
 }

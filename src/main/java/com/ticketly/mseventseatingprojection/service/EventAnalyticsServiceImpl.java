@@ -1,6 +1,9 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.analytics.*;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
@@ -27,7 +30,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
     @Override
     public Mono<EventAnalyticsDTO> getEventAnalytics(String eventId) {
         // Get basic event info for title
-        Mono<String> eventTitleMono = eventAnalyticsRepository.findEventWithCompleteSeatingData(eventId)
+        Mono<String> eventTitleMono = eventAnalyticsRepository.findEventTitleById(eventId)
                 .map(EventDocument::getTitle)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
 
@@ -44,7 +47,7 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
         return Mono.zip(
                         eventTitleMono,
                         overallStatsMono,
-                        sessionStatusCountsFlux.collectMap(SessionStatusCountDTO::getStatus, dto -> dto.getCount()),
+                        sessionStatusCountsFlux.collectMap(SessionStatusCountDTO::getStatus, SessionStatusCountDTO::getCount),
                         tierAnalyticsFlux.collectList()
                 )
                 .map(tuple -> {

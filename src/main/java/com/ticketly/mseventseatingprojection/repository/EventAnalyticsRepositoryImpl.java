@@ -1,8 +1,8 @@
 package com.ticketly.mseventseatingprojection.repository;
 
-import com.ticketly.mseventseatingprojection.dto.analytics.EventOverallStatsDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.SessionStatusCountDTO;
-import com.ticketly.mseventseatingprojection.dto.analytics.TierAnalyticsDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStatsDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
+import com.ticketly.mseventseatingprojection.dto.analytics.raw.TierAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
@@ -24,28 +24,35 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     private final ReactiveMongoTemplate reactiveMongoTemplate;
 
     private static final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
-        {
-            "$project": {
-                "allSeats": {
-                    "$concatArrays": [
-                        { "$ifNull": ["$sessions.layoutData.layout.blocks.seats", []] },
-                        { "$ifNull": [
-                            { "$reduce": {
-                                "input": "$sessions.layoutData.layout.blocks.rows.seats",
-                                "initialValue": [],
-                                "in": { "$concatArrays": ["$$value", "$$this"] }
-                            }},
-                            []
-                        ]}
-                    ]
+            {
+                "$project": {
+                    "allSeats": {
+                        "$concatArrays": [
+                            { "$ifNull": ["$sessions.layoutData.layout.blocks.seats", []] },
+                            { "$ifNull": [
+                                { "$reduce": {
+                                    "input": "$sessions.layoutData.layout.blocks.rows.seats",
+                                    "initialValue": [],
+                                    "in": { "$concatArrays": ["$$value", "$$this"] }
+                                }},
+                                []
+                            ]}
+                        ]
+                    }
                 }
             }
-        }
-        """);
+            """);
 
     @Override
     public Mono<EventDocument> findEventWithCompleteSeatingData(String eventId) {
         Query query = new Query(Criteria.where("id").is(eventId));
+        return reactiveMongoTemplate.findOne(query, EventDocument.class);
+    }
+
+    @Override
+    public Mono<EventDocument> findEventTitleById(String eventId) {
+        Query query = new Query(Criteria.where("id").is(eventId));
+        query.fields().include("title");
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
     }
 
