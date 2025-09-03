@@ -113,7 +113,7 @@ public class DebeziumEventConsumer {
         }
 
         EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
-        if ("APPROVED".equals(eventChange.getStatus())) {
+        if ("APPROVED".equals(eventChange.getStatus()) || "COMPLETED".equals(eventChange.getStatus())) {
             projectorService.projectFullEvent(eventChange.getId())
                     .doOnSuccess(v -> future.complete(null))
                     .doOnError(e -> handleProjectionError(e, future))

@@ -1,9 +1,13 @@
- package com.ticketly.mseventseatingprojection.config;
+package com.ticketly.mseventseatingprojection.config;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.ticketly.mseventseatingprojection.dto.SeatStatusChangeEventDto;
 import com.ticketly.mseventseatingprojection.service.EventProjectionClient;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +19,9 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.ListenerExecutionFailedException;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.ExponentialBackOff;
 
@@ -75,10 +82,15 @@ public class KafkaConsumerConfig {
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, SeatStatusChangeEventDto.class.getName());
 
+        // Important: Skip deserialization errors instead of retrying infinitely
+        props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS, StringDeserializer.class.getName());
+        props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class.getName());
+
+        // Use ErrorHandlingDeserializer to wrap the JsonDeserializer
         return new DefaultKafkaConsumerFactory<>(
                 props,
                 new StringDeserializer(),
-                new JsonDeserializer<>()
+                new ErrorHandlingDeserializer<>(new JsonDeserializer<>())
         );
     }
 
@@ -90,8 +102,22 @@ public class KafkaConsumerConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
         DefaultErrorHandler errorHandler = getDefaultErrorHandler();
+
+        // Add retry-able exceptions (business logic failures that might succeed with retry)
         errorHandler.addRetryableExceptions(EventProjectionClient.ProjectionClientException.class);
-        errorHandler.addNotRetryableExceptions(IllegalArgumentException.class, IllegalStateException.class);
+
+        // Add non-retry-able exceptions (permanent failures)
+        errorHandler.addNotRetryableExceptions(
+            IllegalArgumentException.class,
+            IllegalStateException.class,
+            // Add deserialization related exceptions as non-retryable
+            DeserializationException.class,
+            RecordDeserializationException.class,
+            JsonMappingException.class,
+            InvalidFormatException.class,
+            UnrecognizedPropertyException.class
+        );
+
         factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
@@ -101,7 +127,42 @@ public class KafkaConsumerConfig {
         ExponentialBackOff backOff = new ExponentialBackOff(5000L, 2.0);
         backOff.setMaxInterval(300000L);
         backOff.setMaxElapsedTime(1800000L);
-        return new DefaultErrorHandler((record, exception) -> log.error("Processing failed for record. Topic: {}, Partition: {}, Offset: {}, Exception: {}",
-                record.topic(), record.partition(), record.offset(), exception.getMessage()), backOff);
+
+        return new DefaultErrorHandler(
+            (record, exception) -> {
+                if (isDeserializationException(exception)) {
+                    // For deserialization errors, log but don't try to recover - just skip the message
+                    log.warn("Skipping non-deserializable message. Topic: {}, Partition: {}, Offset: {}, Exception: {}",
+                        record.topic(), record.partition(), record.offset(), exception.getMessage());
+                } else {
+                    // For other errors, log as error as we might retry
+                    log.error("Processing failed for record. Topic: {}, Partition: {}, Offset: {}, Exception: {}",
+                        record.topic(), record.partition(), record.offset(), exception.getMessage());
+                }
+            },
+            backOff
+        );
+    }
+
+    /**
+     * Helper method to check if the exception is related to deserialization
+     */
+    private static boolean isDeserializationException(Exception exception) {
+        Throwable cause = exception;
+
+        // If it's a listener execution exception, get the cause
+        if (exception instanceof ListenerExecutionFailedException) {
+            cause = exception.getCause();
+        }
+
+        // Check if the exception or any of its causes is a deserialization exception
+        while (cause != null) {
+            if (cause instanceof DeserializationException || cause instanceof RecordDeserializationException || cause instanceof JsonMappingException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 }
