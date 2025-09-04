@@ -30,7 +30,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
     private final ReactiveMongoTemplate reactiveMongoTemplate;
 
-    private static final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
+    private final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
             {
                 "$project": {
                     "allSeats": {

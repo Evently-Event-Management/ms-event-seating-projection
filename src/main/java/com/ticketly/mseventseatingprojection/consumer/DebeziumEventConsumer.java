@@ -46,6 +46,7 @@ public class DebeziumEventConsumer {
         String payload = record.value();
 
         log.debug("Received message on topic: {}", topic);
+        log.trace("Payload (truncated): {}", payload == null ? "null" : payload.length() > 200 ? payload.substring(0, 200) + "..." : payload);
         if (payload == null || payload.isBlank()) {
             log.debug("Received tombstone record on topic {}. Ignoring.", topic);
             acknowledgment.acknowledge(); // Safe to acknowledge empty messages
@@ -57,16 +58,22 @@ public class DebeziumEventConsumer {
 
             // Use the topic name to decide which logic to execute
             if (topic.endsWith(".events")) {
+                log.debug("Dispatching to processEventChange for topic {}", topic);
                 processEventChange(payload, processingFuture);
             } else if (topic.endsWith(".event_sessions")) {
+                log.debug("Dispatching to processSessionChange for topic {}", topic);
                 processSessionChange(payload, processingFuture);
             } else if (topic.endsWith(".session_seating_maps")) {
+                log.debug("Dispatching to processSeatingMapChange for topic {}", topic);
                 processSeatingMapChange(payload, processingFuture);
             } else if (topic.endsWith(".organizations")) {
+                log.debug("Dispatching to processOrganizationChange for topic {}", topic);
                 processOrganizationChange(payload, processingFuture);
             } else if (topic.endsWith(".categories")) {
+                log.debug("Dispatching to processCategoryChange for topic {}", topic);
                 processCategoryChange(payload, processingFuture);
             } else if (topic.endsWith(".event_cover_photos")) {
+                log.debug("Dispatching to processCoverPhotoChange for topic {}", topic);
                 processCoverPhotoChange(payload, processingFuture);
             } else {
                 log.warn("Unhandled topic: {}", topic);
@@ -77,7 +84,7 @@ public class DebeziumEventConsumer {
             // Wait for processing to complete before acknowledging
             try {
                 processingFuture.get(30, TimeUnit.SECONDS);
-                log.debug("Processing completed successfully for message on topic: {}", topic);
+                log.info("Processing completed successfully for message on topic: {}", topic);
                 acknowledgment.acknowledge();
             } catch (Exception e) {
                 log.error("Error while waiting for processing to complete for topic {}: {}", topic, e.getMessage());
@@ -102,25 +109,39 @@ public class DebeziumEventConsumer {
     private void processEventChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
+        log.debug("processEventChange - operation: {}", operation);
 
         if ("d".equals(operation)) {
             UUID eventId = UUID.fromString(message.path("before").path("id").asText());
+            log.info("Event delete detected for id: {}. Deleting projection.", eventId);
             projectorService.deleteEvent(eventId)
-                    .doOnSuccess(v -> future.complete(null))
+                    .doOnSuccess(v -> {
+                        log.debug("deleteEvent completed for id: {}", eventId);
+                        future.complete(null);
+                    })
                     .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
 
         EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
+        log.debug("Event after payload id={} status={}", eventChange.getId(), eventChange.getStatus());
         if ("APPROVED".equals(eventChange.getStatus()) || "COMPLETED".equals(eventChange.getStatus())) {
+            log.info("Projecting full event id={} status={}", eventChange.getId(), eventChange.getStatus());
             projectorService.projectFullEvent(eventChange.getId())
-                    .doOnSuccess(v -> future.complete(null))
+                    .doOnSuccess(v -> {
+                        log.debug("projectFullEvent completed for id: {}", eventChange.getId());
+                        future.complete(null);
+                    })
                     .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
         } else {
+            log.info("Removing projection for event id={} due to status={}", eventChange.getId(), eventChange.getStatus());
             projectorService.deleteEvent(eventChange.getId())
-                    .doOnSuccess(v -> future.complete(null))
+                    .doOnSuccess(v -> {
+                        log.debug("deleteEvent completed for id: {}", eventChange.getId());
+                        future.complete(null);
+                    })
                     .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
         }
@@ -129,20 +150,28 @@ public class DebeziumEventConsumer {
     private void processSessionChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
+        log.debug("processSessionChange - operation: {}", operation);
         if ("d".equals(operation)) {
+            log.debug("Session delete detected. Nothing to project.");
             future.complete(null); // Nothing to do for deletes
             return;
         }
 
         SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
+        log.debug("SessionChange payload eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
         eventReadRepository.existsById(sessionChange.getEventId().toString())
                 .flatMap(exists -> {
                     if (exists) {
+                        log.info("Projecting session update for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
                         return projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId())
-                                .doOnSuccess(v -> future.complete(null))
+                                .doOnSuccess(v -> {
+                                    log.debug("projectSessionUpdate completed for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+                                    future.complete(null);
+                                })
                                 .doOnError(e -> handleProjectionError(e, future))
                                 .then(Mono.empty());
                     } else {
+                        log.debug("Event not present in read model for eventId={}. Skipping session projection.", sessionChange.getEventId());
                         // No event exists, we can safely complete the future
                         future.complete(null);
                         return Mono.empty();
@@ -154,12 +183,15 @@ public class DebeziumEventConsumer {
     private void processSeatingMapChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
+        log.debug("processSeatingMapChange - operation: {}", operation);
         if ("c".equals(operation) || "d".equals(operation)) {
+            log.debug("Ignoring seating map create/delete operation: {}", operation);
             future.complete(null); // Nothing to do for creates or deletes
             return;
         }
 
         SeatingMapChangePayload mapChange = objectMapper.treeToValue(message.path("after"), SeatingMapChangePayload.class);
+        log.debug("SeatingMapChange sessionId={} event lookup starting", mapChange.getSessionId());
         eventReadRepository.findEventBySessionId(mapChange.getSessionId().toString())
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(eventDocument -> {
@@ -168,6 +200,7 @@ public class DebeziumEventConsumer {
                             .findFirst().orElse(null);
 
                     if (session == null) {
+                        log.debug("No session found for sessionId={} in event id={}", mapChange.getSessionId(), eventDocument.getId());
                         // No session found, complete the future
                         future.complete(null);
                         return;
@@ -175,27 +208,34 @@ public class DebeziumEventConsumer {
 
                     Mono<Void> projectionMono;
                     if (SessionStatus.ON_SALE.equals(session.getStatus())) {
+                        log.info("Applying seating map patch for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
                         projectionMono = projectorService.projectSeatingMapPatch(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId(),
                                 mapChange.getLayoutData());
                     } else if (SessionStatus.SCHEDULED.equals(session.getStatus())) {
+                        log.info("Session scheduled; projecting session update for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
                         projectionMono = projectorService.projectSessionUpdate(
                                 UUID.fromString(eventDocument.getId()),
                                 mapChange.getSessionId());
                     } else {
+                        log.debug("Session status '{}' not relevant for seating changes. Skipping.", session.getStatus());
                         future.complete(null);
                         return;
                     }
 
                     projectionMono
-                            .doOnSuccess(v -> future.complete(null))
+                            .doOnSuccess(v -> {
+                                log.debug("Seating projection completed for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
+                                future.complete(null);
+                            })
                             .doOnError(e -> handleProjectionError(e, future))
                             .subscribe();
                 })
                 .doFinally(signalType -> {
                     // If no event document found or on completion, ensure future is completed
                     if (!future.isDone()) {
+                        log.debug("Finalizing seating map processing for sessionId={}. Completing future.", mapChange.getSessionId());
                         future.complete(null);
                     }
                 })
@@ -205,19 +245,28 @@ public class DebeziumEventConsumer {
     private void processOrganizationChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
+        log.debug("processOrganizationChange - operation: {}", operation);
 
         if ("d".equals(operation)) {
             String orgId = message.path("before").path("id").asText();
+            log.info("Organization delete detected for id={}. Deleting projection.", orgId);
             projectorService.deleteOrganization(orgId)
-                    .doOnSuccess(v -> future.complete(null))
+                    .doOnSuccess(v -> {
+                        log.debug("deleteOrganization completed for id: {}", orgId);
+                        future.complete(null);
+                    })
                     .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
 
         OrganizationChangePayload orgChange = objectMapper.treeToValue(message.path("after"), OrganizationChangePayload.class);
+        log.info("Projecting organization change for id={}", orgChange.getId());
         projectorService.projectOrganizationChange(orgChange)
-                .doOnSuccess(v -> future.complete(null))
+                .doOnSuccess(v -> {
+                    log.debug("projectOrganizationChange completed for id: {}", orgChange.getId());
+                    future.complete(null);
+                })
                 .doOnError(e -> handleProjectionError(e, future))
                 .subscribe();
     }
@@ -225,19 +274,28 @@ public class DebeziumEventConsumer {
     private void processCategoryChange(String payload, CompletableFuture<?> future) throws Exception {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
+        log.debug("processCategoryChange - operation: {}", operation);
 
         if ("d".equals(operation)) {
             String catId = message.path("before").path("id").asText();
+            log.info("Category delete detected for id={}. Deleting projection.", catId);
             projectorService.deleteCategory(catId)
-                    .doOnSuccess(v -> future.complete(null))
+                    .doOnSuccess(v -> {
+                        log.debug("deleteCategory completed for id: {}", catId);
+                        future.complete(null);
+                    })
                     .doOnError(e -> handleProjectionError(e, future))
                     .subscribe();
             return;
         }
 
         CategoryChangePayload catChange = objectMapper.treeToValue(message.path("after"), CategoryChangePayload.class);
+        log.info("Projecting category change for id={}", catChange.getId());
         projectorService.projectCategoryChange(catChange.getId())
-                .doOnSuccess(v -> future.complete(null))
+                .doOnSuccess(v -> {
+                    log.debug("projectCategoryChange completed for id: {}", catChange.getId());
+                    future.complete(null);
+                })
                 .doOnError(e -> handleProjectionError(e, future))
                 .subscribe();
     }
