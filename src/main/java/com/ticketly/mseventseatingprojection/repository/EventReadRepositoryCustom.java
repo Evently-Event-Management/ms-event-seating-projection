@@ -3,13 +3,14 @@ package com.ticketly.mseventseatingprojection.repository;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 
-
+@Repository
 public interface EventReadRepositoryCustom {
 
     /**

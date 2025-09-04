@@ -30,21 +30,47 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
     private final ReactiveMongoTemplate reactiveMongoTemplate;
 
-    private static final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
+    //    private final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
+//            {
+//                "$project": {
+//                    "allSeats": {
+//                        "$concatArrays": [
+//                            { "$ifNull": ["$sessions.layoutData.layout.blocks.seats", []] },
+//                            { "$ifNull": [
+//                                { "$reduce": {
+//                                    "input": "$sessions.layoutData.layout.blocks.rows.seats",
+//                                    "initialValue": [],
+//                                    "in": { "$concatArrays": ["$$value", "$$this"] }
+//                                }},
+//                                []
+//                            ]}
+//                        ]
+//                    }
+//                }
+//            }
+//            """);
+    private final AggregationOperation UNIFY_SEATS_OPERATION = context -> Document.parse("""
             {
                 "$project": {
                     "allSeats": {
-                        "$concatArrays": [
-                            { "$ifNull": ["$sessions.layoutData.layout.blocks.seats", []] },
-                            { "$ifNull": [
-                                { "$reduce": {
-                                    "input": "$sessions.layoutData.layout.blocks.rows.seats",
-                                    "initialValue": [],
-                                    "in": { "$concatArrays": ["$$value", "$$this"] }
-                                }},
-                                []
-                            ]}
-                        ]
+                        "$reduce": {
+                            "input": "$sessions.layoutData.layout.blocks",
+                            "initialValue": [],
+                            "in": {
+                                "$concatArrays": [
+                                    "$$value",
+                                    { "$ifNull": ["$$this.seats", []] },
+                                    { "$ifNull": [
+                                        { "$reduce": {
+                                            "input": "$$this.rows.seats",
+                                            "initialValue": [],
+                                            "in": { "$concatArrays": ["$$value", "$$this"] }
+                                        }},
+                                        []
+                                    ]}
+                                ]
+                            }
+                        }
                     }
                 }
             }
@@ -125,7 +151,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         Aggregation aggregation = newAggregation(
                 match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
-                unwind("sessions.layoutData.layout.blocks"),
+//                unwind("sessions.layoutData.layout.blocks"),
                 // ++ USE THE NATIVE OPERATION HERE ++
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
@@ -284,7 +310,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         Aggregation aggregation = newAggregation(
                 match(matchCriteria),
                 unwind("sessions"),
-                unwind("sessions.layoutData.layout.blocks"),
+//                unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
@@ -329,7 +355,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
                 match(Criteria.where("sessions._id").is(sessionId)),
-                unwind("sessions.layoutData.layout.blocks"),
+//                unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
