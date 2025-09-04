@@ -1,8 +1,8 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatInfoRequest;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
-import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.service.SeatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +61,7 @@ public class InternalQueryController {
      */
     @PostMapping("/{sessionId}/seats/details")
     @PreAuthorize("hasAuthority('SCOPE_internal-api')")
-    public Flux<EventDocument.SeatInfo> getSeatDetails(
+    public Flux<SeatDetailsResponse> getSeatDetails(
             @PathVariable String sessionId,
             @Valid @RequestBody SeatInfoRequest request) {
 

@@ -49,7 +49,8 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 radiusKm, dateFrom, dateTo, priceMin, priceMax, pageable);
     }
 
-    private Mono<Criteria> getCategoryCriteria(String categoryId) {
+    @Override
+    public Mono<Criteria> getCategoryCriteria(String categoryId) {
         return categoryReadRepository.findByParentId(categoryId)
                 .collectList()
                 .map(subcategories -> {
@@ -64,7 +65,8 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 });
     }
 
-    private Mono<Page<EventDocument>> executeAggregation(
+    @Override
+    public Mono<Page<EventDocument>> executeAggregation(
             String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable) {
@@ -153,16 +155,19 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     // findEventBySessionId remains unchanged.
     @Override
-    public Mono<EventDocument> findEventBySessionId(String sessionId) {
+    public Mono<EventDocument> findSessionBasicInfoById(String sessionId) {
+        Query query = new Query(Criteria.where("sessions.id").is(sessionId));
+        query.fields().exclude("sessions.layoutData");
         return reactiveMongoTemplate.findOne(
-                new Query(Criteria.where("sessions.id").is(sessionId)),
+                query,
                 EventDocument.class
         );
     }
 
     @Override
-    public Mono<EventDocument> findEventById(String eventId) {
+    public Mono<EventDocument> findEventBasicInfoById(String eventId) {
         Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
+        query.fields().exclude("sessions");
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
     }
 
@@ -240,7 +245,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Replace root to promote session sub-document
         AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
 
-        // Project only necessary fields for SessionInfoDTO
+        // Project only necessary fields for SessionInfoDTO excluding layoutData
         AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails", "salesStartTime");
 
         // Sort by startTime in ascending order
