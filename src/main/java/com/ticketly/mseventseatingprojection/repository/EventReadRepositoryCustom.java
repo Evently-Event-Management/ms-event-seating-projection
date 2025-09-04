@@ -3,7 +3,6 @@ package com.ticketly.mseventseatingprojection.repository;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -29,13 +28,6 @@ public interface EventReadRepositoryCustom {
             BigDecimal priceMax,
             Pageable pageable
     );
-
-    Mono<Criteria> getCategoryCriteria(String categoryId);
-
-    Mono<Page<EventDocument>> executeAggregation(
-            String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
-            Integer radiusKm, Instant dateFrom, Instant dateTo,
-            BigDecimal priceMin, BigDecimal priceMax, Pageable pageable);
 
     Mono<EventDocument> findEventBySessionId(String sessionId);
 

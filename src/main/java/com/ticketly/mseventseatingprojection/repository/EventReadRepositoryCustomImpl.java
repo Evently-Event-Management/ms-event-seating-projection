@@ -49,8 +49,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 radiusKm, dateFrom, dateTo, priceMin, priceMax, pageable);
     }
 
-    @Override
-    public Mono<Criteria> getCategoryCriteria(String categoryId) {
+    private Mono<Criteria> getCategoryCriteria(String categoryId) {
         return categoryReadRepository.findByParentId(categoryId)
                 .collectList()
                 .map(subcategories -> {
@@ -65,8 +64,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                 });
     }
 
-    @Override
-    public Mono<Page<EventDocument>> executeAggregation(
+    private Mono<Page<EventDocument>> executeAggregation(
             String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable) {
