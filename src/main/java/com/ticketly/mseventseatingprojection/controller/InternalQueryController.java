@@ -2,11 +2,12 @@ package com.ticketly.mseventseatingprojection.controller;
 
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsRequest;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
-import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationRequest;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatInfoRequest;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequestMapping("/internal/v1/sessions") // Dedicated path for internal M2M calls
 @RequiredArgsConstructor
+@Slf4j
 public class InternalQueryController {
 
     private final EventQueryService eventQueryService;
@@ -32,10 +34,14 @@ public class InternalQueryController {
     @PreAuthorize("hasAuthority('SCOPE_internal-api')")
     public Mono<ResponseEntity<SeatValidationResponse>> validateSeats(
             @PathVariable String sessionId,
-            @Valid @RequestBody SeatValidationRequest request) {
+            @Valid @RequestBody SeatInfoRequest request) {
+
+        log.info("validateSeats requested for sessionId={}, seatIdsCount={}. Will validate availability.", sessionId, request.getSeatIds() != null ? request.getSeatIds().size() : 0);
+        log.debug("validateSeats request payload: {}", request);
 
         return eventQueryService.validateSeatsAvailability(sessionId, request)
                 .map(response -> {
+                    log.info("validateSeats result for sessionId={}: allAvailable={}", sessionId, response.isAllAvailable());
                     if (response.isAllAvailable()) {
                         return ResponseEntity.ok(response);
                     } else {
@@ -59,6 +65,9 @@ public class InternalQueryController {
     public Flux<SeatDetailsResponse> getSeatDetails(
             @PathVariable String sessionId,
             @Valid @RequestBody SeatDetailsRequest request) {
+
+        log.info("getSeatDetails requested for sessionId={}, requestedSeatCount={}. Will fetch seat details.", sessionId, request.getSeatIds() != null ? request.getSeatIds().size() : 0);
+        log.debug("getSeatDetails request payload: {}", request);
 
         return eventQueryService.getSeatDetails(sessionId, request.getSeatIds());
     }
