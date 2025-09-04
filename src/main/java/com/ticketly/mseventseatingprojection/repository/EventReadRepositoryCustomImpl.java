@@ -153,16 +153,18 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     // findEventBySessionId remains unchanged.
     @Override
-    public Mono<EventDocument> findEventBySessionId(String sessionId) {
+    public Mono<EventDocument> findSessionBasicInfoById(String sessionId) {
+        Query query = new Query(Criteria.where("sessions.id").is(sessionId));
+        query.fields().exclude("sessions.layoutData");
         return reactiveMongoTemplate.findOne(
-                new Query(Criteria.where("sessions.id").is(sessionId)),
+                query,
                 EventDocument.class
         );
     }
 
-    @Override
-    public Mono<EventDocument> findEventById(String eventId) {
+    public Mono<EventDocument> findEventBasicInfoById(String eventId) {
         Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
+        query.fields().exclude("sessions");
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
     }
 
@@ -240,7 +242,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Replace root to promote session sub-document
         AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
 
-        // Project only necessary fields for SessionInfoDTO
+        // Project only necessary fields for SessionInfoDTO excluding layoutData
         AggregationOperation projectFields = Aggregation.project("id", "startTime", "endTime", "status", "sessionType", "venueDetails", "salesStartTime");
 
         // Sort by startTime in ascending order

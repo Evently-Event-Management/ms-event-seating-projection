@@ -95,7 +95,7 @@ public class EventQueryService {
      */
     public Mono<EventBasicInfoDTO> getBasicEventInfo(String eventId) {
         log.debug("getBasicEventInfo called for eventId={}", eventId);
-        return eventReadRepository.findEventById(eventId)
+        return eventReadRepository.findEventBasicInfoById(eventId)
                 .map(event -> EventBasicInfoDTO.builder()
                         .id(event.getId())
                         .title(event.getTitle())
@@ -125,7 +125,7 @@ public class EventQueryService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
     }
 
-    public Mono<Page<SessionInfoDTO>> findSessionsByEventId(String eventId, Pageable pageable) {
+    public Mono<Page<SessionInfoDTO>> findSessionsBasicInfoByEventId(String eventId, Pageable pageable) {
         log.debug("findSessionsByEventId called for eventId={}, pageable={}", eventId, pageable);
         return eventReadRepository.findSessionsByEventId(eventId, pageable)
                 .map(sessionPage -> sessionPage.map(this::mapToSessionInfoDTO))
@@ -195,7 +195,7 @@ public class EventQueryService {
      */
     public Mono<SessionInfoDTO> getSessionById(String sessionId) {
         log.debug("getSessionById called for sessionId={}", sessionId);
-        return eventReadRepository.findEventBySessionId(sessionId)
+        return eventReadRepository.findSessionBasicInfoById(sessionId)
                 .flatMap(eventDocument -> {
                     // Find the specific session within the event document
                     return Mono.justOrEmpty(eventDocument.getSessions().stream()

@@ -60,7 +60,7 @@ public class EventQueryController {
             @PathVariable String eventId,
             @PageableDefault(sort = "startTime", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return eventQueryService.findSessionsByEventId(eventId, pageable)
+        return eventQueryService.findSessionsBasicInfoByEventId(eventId, pageable)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

@@ -29,9 +29,9 @@ public interface EventReadRepositoryCustom {
             Pageable pageable
     );
 
-    Mono<EventDocument> findEventBySessionId(String sessionId);
+    Mono<EventDocument> findSessionBasicInfoById(String sessionId);
 
-    Mono<EventDocument> findEventById(String eventId);
+    Mono<EventDocument> findEventBasicInfoById(String eventId);
 
     Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable);
 
