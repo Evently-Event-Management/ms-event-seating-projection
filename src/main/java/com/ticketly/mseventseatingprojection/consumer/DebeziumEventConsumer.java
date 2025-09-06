@@ -329,12 +329,16 @@ public class DebeziumEventConsumer {
                                     .doOnSuccess(v -> future.complete(null))
                                     .doOnError(e -> handleProjectionError(e, future))
                                     .then(Mono.empty());
-                        } else { // 'd' for delete
+                        } else if ("d".equals(operation)) {
                             log.info("Projecting cover photo removal for event ID: {}", photoChange.getEventId());
                             return projectorService.projectCoverPhotoRemoved(photoChange.getEventId(), photoChange.getPhotoUrl())
                                     .doOnSuccess(v -> future.complete(null))
                                     .doOnError(e -> handleProjectionError(e, future))
                                     .then(Mono.empty());
+                        } else {
+                            log.warn("Unhandled operation '{}' for cover photo change. Ignoring.", operation);
+                            future.complete(null);
+                            return Mono.empty();
                         }
                     } else {
                         // No event exists, we can safely complete the future
