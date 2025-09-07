@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.read.SessionStatusInfo;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,4 +53,6 @@ public interface EventReadRepositoryCustom {
     Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId);
 
     Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate);
+
+    Mono<SessionStatusInfo> findSessionStatusById(String sessionId);
 }

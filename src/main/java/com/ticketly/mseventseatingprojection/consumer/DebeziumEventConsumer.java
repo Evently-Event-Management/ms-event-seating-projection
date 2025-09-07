@@ -3,7 +3,7 @@ package com.ticketly.mseventseatingprojection.consumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketly.mseventseatingprojection.dto.*;
-import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustom;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.service.EventProjectionClient;
 import com.ticketly.mseventseatingprojection.service.ProjectorService;
@@ -29,6 +29,7 @@ public class DebeziumEventConsumer {
     private final ProjectorService projectorService;
     private final EventRepository eventReadRepository;
     private final ObjectMapper objectMapper;
+    private final EventReadRepositoryCustom eventReadRepositoryCustom;
 
     // ✅ A single listener for all Debezium topics
     @KafkaListener(topics = {
@@ -184,58 +185,56 @@ public class DebeziumEventConsumer {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
         log.debug("processSeatingMapChange - operation: {}", operation);
+
         if ("c".equals(operation) || "d".equals(operation)) {
             log.debug("Ignoring seating map create/delete operation: {}", operation);
-            future.complete(null); // Nothing to do for creates or deletes
+            future.complete(null);
             return;
         }
 
         SeatingMapChangePayload mapChange = objectMapper.treeToValue(message.path("after"), SeatingMapChangePayload.class);
-        log.debug("SeatingMapChange sessionId={} event lookup starting", mapChange.getSessionId());
-        eventReadRepository.findEventBySessionId(mapChange.getSessionId().toString())
-                .publishOn(Schedulers.boundedElastic())
-                .doOnNext(eventDocument -> {
-                    EventDocument.SessionInfo session = eventDocument.getSessions().stream()
-                            .filter(s -> s.getId().equals(mapChange.getSessionId().toString()))
-                            .findFirst().orElse(null);
+        String sessionIdStr = mapChange.getSessionId().toString();
+        log.debug("SeatingMapChange sessionId={} lookup starting", sessionIdStr);
 
-                    if (session == null) {
-                        log.debug("No session found for sessionId={} in event id={}", mapChange.getSessionId(), eventDocument.getId());
-                        // No session found, complete the future
-                        future.complete(null);
-                        return;
-                    }
+        // ++ CHANGE: Call the new, efficient repository method ++
+        eventReadRepositoryCustom.findSessionStatusById(sessionIdStr)
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(sessionStatusInfo -> {
+                    // The repository now returns only the data we need
+                    String eventId = sessionStatusInfo.getId();
+                    SessionStatus status = sessionStatusInfo.getSessionStatus();
+                    UUID sessionId = mapChange.getSessionId();
 
                     Mono<Void> projectionMono;
-                    if (SessionStatus.ON_SALE.equals(session.getStatus())) {
-                        log.info("Applying seating map patch for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
+                    if (SessionStatus.ON_SALE.equals(status)) {
+                        log.info("Applying seating map patch for eventId={} sessionId={}", eventId, sessionIdStr);
                         projectionMono = projectorService.projectSeatingMapPatch(
-                                UUID.fromString(eventDocument.getId()),
-                                mapChange.getSessionId(),
+                                UUID.fromString(eventId),
+                                sessionId,
                                 mapChange.getLayoutData());
-                    } else if (SessionStatus.SCHEDULED.equals(session.getStatus())) {
-                        log.info("Session scheduled; projecting session update for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
+                    } else if (SessionStatus.SCHEDULED.equals(status)) {
+                        log.info("Session scheduled; projecting session update for eventId={} sessionId={}", eventId, sessionIdStr);
                         projectionMono = projectorService.projectSessionUpdate(
-                                UUID.fromString(eventDocument.getId()),
-                                mapChange.getSessionId());
+                                UUID.fromString(eventId),
+                                sessionId);
                     } else {
-                        log.debug("Session status '{}' not relevant for seating changes. Skipping.", session.getStatus());
+                        log.debug("Session status '{}' not relevant for seating changes. Skipping.", status);
                         future.complete(null);
                         return;
                     }
 
                     projectionMono
                             .doOnSuccess(v -> {
-                                log.debug("Seating projection completed for eventId={} sessionId={}", eventDocument.getId(), mapChange.getSessionId());
+                                log.debug("Seating projection completed for eventId={} sessionId={}", eventId, sessionIdStr);
                                 future.complete(null);
                             })
                             .doOnError(e -> handleProjectionError(e, future))
                             .subscribe();
                 })
                 .doFinally(signalType -> {
-                    // If no event document found or on completion, ensure future is completed
+                    // If the mono was empty (no session found) or on completion, ensure the future is completed
                     if (!future.isDone()) {
-                        log.debug("Finalizing seating map processing for sessionId={}. Completing future.", mapChange.getSessionId());
+                        log.debug("Finalizing seating map processing for sessionId={}. Completing future.", sessionIdStr);
                         future.complete(null);
                     }
                 })

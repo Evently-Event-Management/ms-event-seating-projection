@@ -14,6 +14,18 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     Mono<EventDocument> findEventBySessionId(String sessionId);
 
     /**
+     * Efficiently finds a single session within an event by its ID.
+     * Uses a projection to return only the matching session object, EXCLUDING
+     * the large 'layoutData' field for maximum efficiency.
+     *
+     * @param sessionId The ID of the session to find.
+     * @return A Mono emitting the found SessionInfo or empty if not found.
+     */
+    // ++ The 'fields' attribute is updated to exclude layoutData ++
+    @Query(value = "{ 'sessions.id': ?0 }", fields = "{ 'sessions.$': 1, 'sessions.$.layoutData': 0 }")
+    Mono<EventDocument> findSessionById(String sessionId);
+
+    /**
      * Performs a targeted update on a single session within an event document.
      * The '$' is a positional operator that updates the first element in the 'sessions'
      * array that matches the query condition.
