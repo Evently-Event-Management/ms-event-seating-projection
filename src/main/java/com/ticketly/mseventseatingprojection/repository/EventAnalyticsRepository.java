@@ -60,6 +60,7 @@ public interface EventAnalyticsRepository {
      * Get tier-based sales analytics for an event using aggregation
      *
      * @param eventId The ID of the event to analyze
+     * @param sessionId The ID of the session to analyze
      * @return A Flux containing tier analytics data
      */
     Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId);
@@ -71,7 +72,6 @@ public interface EventAnalyticsRepository {
      * @return A Mono containing the event document with only the title field
      */
     Mono<EventDocument> findEventTitleById(String eventId);
-
 
     /**
      * Get summaries for all sessions of an event using aggregation
@@ -90,11 +90,11 @@ public interface EventAnalyticsRepository {
      */
     Mono<SessionSummaryDTO> getSessionSummary(String eventId, String sessionId);
 
-
     /**
      * Get session status counts for an event using aggregation
      *
      * @param eventId The ID of the event to analyze
+     * @param sessionId The ID of the session to analyze
      * @return A Flux containing the count of sessions by status
      */
     Flux<SeatStatusCountDTO> getSessionStatusCounts(String eventId, String sessionId);

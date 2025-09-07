@@ -32,8 +32,11 @@ public class EventProjectionClient {
     private String eventServiceBaseUrl;
 
     /**
-     * Get event projection data from the command service
-     * Any connection or response errors will be wrapped in a ProjectionClientException
+     * Get event projection data from the command service.
+     * Any connection or response errors will be wrapped in a ProjectionClientException.
+     *
+     * @param eventId The UUID of the event.
+     * @return Mono emitting EventProjectionDTO.
      */
     public Mono<EventProjectionDTO> getEventProjectionData(UUID eventId) {
         String url = String.format("%s/internal/v1/events/%s/projection-data", eventServiceBaseUrl, eventId);
@@ -47,8 +50,11 @@ public class EventProjectionClient {
     }
 
     /**
-     * Get session projection data from the command service
-     * Any connection or response errors will be wrapped in a ProjectionClientException
+     * Get session projection data from the command service.
+     * Any connection or response errors will be wrapped in a ProjectionClientException.
+     *
+     * @param sessionId The UUID of the session.
+     * @return Mono emitting SessionProjectionDTO.
      */
     public Mono<SessionProjectionDTO> getSessionProjectionData(UUID sessionId) {
         String url = String.format("%s/internal/v1/sessions/%s/projection-data", eventServiceBaseUrl, sessionId);
@@ -62,8 +68,11 @@ public class EventProjectionClient {
     }
 
     /**
-     * Get category projection data from the command service
-     * Any connection or response errors will be wrapped in a ProjectionClientException
+     * Get category projection data from the command service.
+     * Any connection or response errors will be wrapped in a ProjectionClientException.
+     *
+     * @param categoryId The UUID of the category.
+     * @return Mono emitting CategoryProjectionDTO.
      */
     public Mono<CategoryProjectionDTO> getCategoryProjectionData(UUID categoryId) {
         String url = String.format("%s/internal/v1/categories/%s/projection-data", eventServiceBaseUrl, categoryId);

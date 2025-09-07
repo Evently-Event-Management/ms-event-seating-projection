@@ -43,6 +43,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable
     ) {
+        // Performs a complex search for events with multiple optional filters.
         if (categoryId != null) {
             return getCategoryCriteria(categoryId)
                     .flatMap(categoryCriteria -> executeAggregation(searchTerm, categoryCriteria, longitude, latitude,
@@ -54,6 +55,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<Criteria> getCategoryCriteria(String categoryId) {
+        // Builds a Criteria object for category filtering, including subcategories if present.
         return categoryReadRepository.findByParentId(categoryId)
                 .collectList()
                 .map(subcategories -> {
@@ -73,7 +75,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
             String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable) {
-
+        // Executes the aggregation pipeline for event search with all filters applied.
         List<AggregationOperation> pipeline = new ArrayList<>();
         List<Criteria> matchCriteriaList = new ArrayList<>();
 
@@ -159,6 +161,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     // findEventBySessionId remains unchanged.
     @Override
     public Mono<EventDocument> findSessionBasicInfoById(String sessionId) {
+        // Finds the event document containing a session by session ID, excluding layout data.
         Query query = new Query(Criteria.where("sessions.id").is(sessionId));
         query.fields().exclude("sessions.layoutData");
         return reactiveMongoTemplate.findOne(
@@ -169,6 +172,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<EventDocument> findEventBasicInfoById(String eventId) {
+        // Finds basic event info by event ID, excluding sessions.
         Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
         query.fields().exclude("sessions");
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
@@ -176,6 +180,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable) {
+        // Finds sessions for a given event, paginated.
         // --- Aggregation Pipeline for Sessions ---
 
         // Stage 1: Match the parent event document by its ID.
@@ -221,6 +226,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId) {
+        // Finds the seating map for a specific session by its ID.
         return reactiveMongoTemplate.findOne(
                         new Query(Criteria.where("sessions.id").is(sessionId)),
                         EventDocument.class
@@ -236,6 +242,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
+        // Finds sessions for a given event within a date range.
         // Match the event by ID
         AggregationOperation matchEvent = match(Criteria.where("_id").is(eventId));
 
@@ -271,6 +278,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<SessionStatusInfo> findSessionStatusById(String sessionId) {
+        // Finds the status of a session by its ID.
         // Build the aggregation pipeline to fetch only the necessary fields
         Aggregation aggregation = newAggregation(
                 // Stage 1: Find the document containing the session

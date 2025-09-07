@@ -10,6 +10,12 @@ import reactor.core.publisher.Mono;
 @Repository
 public interface EventRepository extends ReactiveMongoRepository<EventDocument, String> {
 
+    /**
+     * Finds the event document containing a session by session ID.
+     *
+     * @param sessionId The session ID to search for.
+     * @return Mono emitting the EventDocument containing the session.
+     */
     @Query("{ 'sessions.id': ?0 }")
     Mono<EventDocument> findEventBySessionId(String sessionId);
 
@@ -21,7 +27,6 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
      * @param sessionId The ID of the session to find.
      * @return A Mono emitting the found SessionInfo or empty if not found.
      */
-    // ++ The 'fields' attribute is updated to exclude layoutData ++
     @Query(value = "{ 'sessions.id': ?0 }", fields = "{ 'sessions.$': 1, 'sessions.$.layoutData': 0 }")
     Mono<EventDocument> findSessionById(String sessionId);
 
@@ -51,7 +56,6 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     @Update("{ '$set': { 'sessions.$.layoutData': ?2 } }")
     Mono<Long> updateSeatingMapInSession(String eventId, String sessionId, EventDocument.SessionSeatingMapInfo seatingMapInfo);
 
-
     /**
      * Updates the organization information in all events that belong to a specific organization.
      * This is useful when an organization changes its details and we need to propagate those changes
@@ -78,7 +82,6 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     @Query("{ 'category.id': ?0 }")
     @Update("{ '$set': { 'category': ?1 } }")
     Mono<Long> updateCategoryInfoInEvents(String categoryId, EventDocument.CategoryInfo categoryInfo);
-
 
     /**
      * Atomically adds a new photo URL to the coverPhotos array of an event.

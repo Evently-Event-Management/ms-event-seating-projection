@@ -23,6 +23,12 @@ public class EventAnalyticsController {
 
     private final EventAnalyticsService eventAnalyticsService;
 
+    /**
+     * Get comprehensive analytics for an event.
+     *
+     * @param eventId The event ID.
+     * @return Mono emitting ResponseEntity with EventAnalyticsDTO or not found.
+     */
     @GetMapping("/events/{eventId}")
     @Operation(summary = "Get comprehensive analytics for an event",
             description = "Returns aggregated analytics across all sessions including revenue, tickets sold, and capacity metrics")
@@ -32,6 +38,12 @@ public class EventAnalyticsController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get basic analytics for all sessions in an event.
+     *
+     * @param eventId The event ID.
+     * @return Flux emitting SessionSummaryDTO for each session.
+     */
     @GetMapping("/events/{eventId}/sessions")
     @Operation(summary = "Get basic analytics for all sessions in an event",
             description = "Returns basic analytics for each session including revenue, tickets sold, and capacity")
@@ -39,6 +51,13 @@ public class EventAnalyticsController {
         return eventAnalyticsService.getAllSessionsAnalytics(eventId);
     }
 
+    /**
+     * Get detailed analytics for a specific session.
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID.
+     * @return Mono emitting ResponseEntity with SessionAnalyticsDTO or not found.
+     */
     @GetMapping("/events/{eventId}/sessions/{sessionId}")
     @Operation(summary = "Get detailed analytics for a specific session",
             description = "Returns detailed analytics for a specific session including revenue, capacity, and seat status breakdown")

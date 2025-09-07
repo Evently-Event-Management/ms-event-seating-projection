@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface OrganizationRepository extends ReactiveMongoRepository<OrganizationDocument, String> {
+    // No additional methods; standard CRUD operations are provided by ReactiveMongoRepository.
 }

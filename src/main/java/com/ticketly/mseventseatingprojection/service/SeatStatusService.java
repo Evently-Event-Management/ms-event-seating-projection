@@ -24,6 +24,14 @@ public class SeatStatusService {
     private final ReactiveMongoTemplate mongoTemplate;
     private final EventRepository eventRepository;
 
+    /**
+     * Updates the status of the specified seats for a given session.
+     *
+     * @param sessionId The ID of the session.
+     * @param seatIds   The list of seat IDs to update.
+     * @param seatStatus The new status to set for the seats.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus seatStatus) {
         if (seatIds == null || seatIds.isEmpty()) {
             return Mono.empty();
@@ -63,6 +71,14 @@ public class SeatStatusService {
                 });
     }
 
+    /**
+     * Updates the status of the specified seats for a given session using UUIDs.
+     *
+     * @param sessionId The UUID of the session.
+     * @param seatIds   The list of seat UUIDs to update.
+     * @param seatStatus The new status to set for the seats.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus seatStatus) {
         List<String> seatIdStrings = seatIds.stream()
                 .map(UUID::toString)
