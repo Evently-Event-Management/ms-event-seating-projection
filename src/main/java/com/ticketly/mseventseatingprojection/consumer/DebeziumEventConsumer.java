@@ -201,6 +201,8 @@ public class DebeziumEventConsumer {
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(sessionStatusInfo -> {
                     // The repository now returns only the data we need
+                    log.debug("Found session status info for sessionId={}: {}", sessionIdStr, sessionStatusInfo);
+
                     String eventId = sessionStatusInfo.getId();
                     SessionStatus status = sessionStatusInfo.getSessionStatus();
                     UUID sessionId = mapChange.getSessionId();

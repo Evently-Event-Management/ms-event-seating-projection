@@ -274,11 +274,11 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Build the aggregation pipeline to fetch only the necessary fields
         Aggregation aggregation = newAggregation(
                 // Stage 1: Find the document containing the session
-                match(Criteria.where("sessions.id").is(sessionId)),
+                match(Criteria.where("sessions._id").is(sessionId)),
                 // Stage 2: Deconstruct the sessions array
                 unwind("sessions"),
                 // Stage 3: Keep only the specific session
-                match(Criteria.where("sessions.id").is(sessionId)),
+                match(Criteria.where("sessions._id").is(sessionId)),
                 // Stage 4: Project ONLY the fields you absolutely need
                 project()
                         .and("_id").as("id") // Map the event ID

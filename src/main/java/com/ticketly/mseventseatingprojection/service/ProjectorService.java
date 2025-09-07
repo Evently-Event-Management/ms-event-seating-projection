@@ -57,7 +57,7 @@ public class ProjectorService {
     }
 
     public Mono<Void> projectSeatingMapPatch(UUID eventId, UUID sessionId, String layoutJson) {
-        log.info("Projecting seating map update for event ID: {} and session ID: {}", eventId, sessionId);
+        log.info("Projecting seating map patch for event ID: {} and session ID: {}", eventId, sessionId);
 
         return eventRepository.findById(eventId.toString())
                 .flatMap(eventDocument -> {
