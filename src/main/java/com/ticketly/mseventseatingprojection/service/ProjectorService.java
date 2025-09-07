@@ -35,6 +35,7 @@ public class ProjectorService {
     private final SessionSeatingMapper sessionSeatingMapper;
     private final S3UrlGenerator s3UrlGenerator;
 
+
     public Mono<Void> projectFullEvent(UUID eventId) {
         log.info("Projecting full event for ID: {}", eventId);
         return eventProjectionClient.getEventProjectionData(eventId)

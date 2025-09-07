@@ -165,90 +165,6 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 .defaultIfEmpty(new EventOverallStatsDTO());
     }
 
-    /**
-     * Creates an aggregation pipeline for session analytics with common operations
-     *
-     * @return Aggregation pipeline with all operations except initial match
-     */
-    private List<AggregationOperation> createSessionAnalyticsPipeline() {
-        // Define the complex stages using native JSON for clarity and correctness
-        AggregationOperation unifySeatsOperation = context -> Document.parse("""
-                    {
-                        "$addFields": {
-                            "unifiedSeats": {
-                                "$reduce": {
-                                    "input": "$sessions.layoutData.layout.blocks",
-                                    "initialValue": [],
-                                    "in": { "$concatArrays": [ "$$value", { "$ifNull": ["$$this.seats", []] }, { "$ifNull": [ { "$reduce": { "input": "$$this.rows.seats", "initialValue": [], "in": { "$concatArrays": ["$$value", "$$this"] }}}, [] ]} ] }
-                                }
-                            }
-                        }
-                    }
-                """);
-
-        AggregationOperation calculateStatsOperation = context -> Document.parse("""
-                    {
-                        "$addFields": {
-                            "sessionCapacity": { "$size": "$unifiedSeats" },
-                            "bookedSeats": {
-                                "$filter": { "input": "$unifiedSeats", "as": "seat", "cond": { "$eq": ["$$seat.status", "BOOKED"] } }
-                            }
-                        }
-                    }
-                """);
-
-        AggregationOperation calculateFinalMetricsOperation = context -> Document.parse("""
-                    {
-                        "$addFields": {
-                            "ticketsSold": { "$size": "$bookedSeats" },
-                            "sessionRevenue": { "$sum": { "$map": { "input": "$bookedSeats", "as": "seat", "in": { "$toDecimal": "$$seat.tier.price" } } } }
-                        }
-                    }
-                """);
-
-        // Add the sellOutPercentage directly as a Document stage
-        AggregationOperation calculateSellOutPercentage = context -> Document.parse("""
-                    {
-                        "$addFields": {
-                            "sellOutPercentage": {
-                                "$cond": [
-                                    { "$gt": ["$sessionCapacity", 0] },
-                                    { "$multiply": [{ "$divide": ["$ticketsSold", "$sessionCapacity"] }, 100] },
-                                    0
-                                ]
-                            }
-                        }
-                    }
-                """);
-
-        // Final projection without complex expressions
-        AggregationOperation finalProjection = context -> Document.parse("""
-                     {
-                         "$project": {
-                             "sessionId": "$sessions._id",
-                             "eventId": "$_id",
-                             "eventTitle": "$title",
-                             "startTime": "$sessions.startTime",
-                             "endTime": "$sessions.endTime",
-                             "sessionStatus": "$sessions.status",
-                             "salesStartTime": "$sessions.salesStartTime",
-                             "sessionCapacity": 1,
-                             "ticketsSold": 1,
-                             "sessionRevenue": 1,
-                             "sellOutPercentage": 1
-                         }
-                     }
-                """);
-
-        return List.of(
-                unifySeatsOperation,
-                calculateStatsOperation,
-                calculateFinalMetricsOperation,
-                calculateSellOutPercentage,
-                finalProjection
-        );
-    }
-
     @Override
     public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
         List<AggregationOperation> commonPipeline = createSessionAnalyticsPipeline();
@@ -431,6 +347,90 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         );
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", BlockOccupancyDTO.class);
+    }
+
+    /**
+     * Creates an aggregation pipeline for session analytics with common operations
+     *
+     * @return Aggregation pipeline with all operations except initial match
+     */
+    private List<AggregationOperation> createSessionAnalyticsPipeline() {
+        // Define the complex stages using native JSON for clarity and correctness
+        AggregationOperation unifySeatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "unifiedSeats": {
+                                "$reduce": {
+                                    "input": "$sessions.layoutData.layout.blocks",
+                                    "initialValue": [],
+                                    "in": { "$concatArrays": [ "$$value", { "$ifNull": ["$$this.seats", []] }, { "$ifNull": [ { "$reduce": { "input": "$$this.rows.seats", "initialValue": [], "in": { "$concatArrays": ["$$value", "$$this"] }}}, [] ]} ] }
+                                }
+                            }
+                        }
+                    }
+                """);
+
+        AggregationOperation calculateStatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "sessionCapacity": { "$size": "$unifiedSeats" },
+                            "bookedSeats": {
+                                "$filter": { "input": "$unifiedSeats", "as": "seat", "cond": { "$eq": ["$$seat.status", "BOOKED"] } }
+                            }
+                        }
+                    }
+                """);
+
+        AggregationOperation calculateFinalMetricsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "ticketsSold": { "$size": "$bookedSeats" },
+                            "sessionRevenue": { "$sum": { "$map": { "input": "$bookedSeats", "as": "seat", "in": { "$toDecimal": "$$seat.tier.price" } } } }
+                        }
+                    }
+                """);
+
+        // Add the sellOutPercentage directly as a Document stage
+        AggregationOperation calculateSellOutPercentage = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "sellOutPercentage": {
+                                "$cond": [
+                                    { "$gt": ["$sessionCapacity", 0] },
+                                    { "$multiply": [{ "$divide": ["$ticketsSold", "$sessionCapacity"] }, 100] },
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                """);
+
+        // Final projection without complex expressions
+        AggregationOperation finalProjection = context -> Document.parse("""
+                     {
+                         "$project": {
+                             "sessionId": "$sessions._id",
+                             "eventId": "$_id",
+                             "eventTitle": "$title",
+                             "startTime": "$sessions.startTime",
+                             "endTime": "$sessions.endTime",
+                             "sessionStatus": "$sessions.status",
+                             "salesStartTime": "$sessions.salesStartTime",
+                             "sessionCapacity": 1,
+                             "ticketsSold": 1,
+                             "sessionRevenue": 1,
+                             "sellOutPercentage": 1
+                         }
+                     }
+                """);
+
+        return List.of(
+                unifySeatsOperation,
+                calculateStatsOperation,
+                calculateFinalMetricsOperation,
+                calculateSellOutPercentage,
+                finalProjection
+        );
     }
 }
 
