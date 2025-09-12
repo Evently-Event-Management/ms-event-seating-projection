@@ -1,14 +1,9 @@
 package com.ticketly.mseventseatingprojection.service;
 
-import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
-import com.ticketly.mseventseatingprojection.repository.EventRepository;
+import com.ticketly.mseventseatingprojection.repository.SeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -28,10 +23,10 @@ public class SeatStatusService {
      *
      * @param sessionId The ID of the session.
      * @param seatIds   The list of seat IDs to update.
-     * @param seatStatus The new status to set for the seats.
+     * @param newStatus The new status to set for the seats.
      * @return Mono signaling completion.
      */
-    public Mono<Boolean> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus seatStatus) {
+    public Mono<Boolean> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
         if (seatIds == null || seatIds.isEmpty()) {
             return Mono.just(false);
         }
@@ -61,10 +56,10 @@ public class SeatStatusService {
      *
      * @param sessionId The UUID of the session.
      * @param seatIds   The list of seat UUIDs to update.
-     * @param seatStatus The new status to set for the seats.
+     * @param newStatus The new status to set for the seats.
      * @return Mono signaling completion.
      */
-    public Mono<Boolean> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus seatStatus) {
+    public Mono<Boolean> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus newStatus) {
         List<String> seatIdStrings = seatIds.stream()
                 .map(UUID::toString)
                 .collect(Collectors.toList());
