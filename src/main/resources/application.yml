@@ -39,10 +39,10 @@ spring:
 
 logging:
   level:
-    root: INFO
-    com.ticketly: DEBUG
-    org.springframework.security: WARN
-    org.springframework.data.mongodb.core.ReactiveMongoTemplate: WARN
+    root: ${ROOT_LOG_LEVEL:INFO}
+    com.ticketly: ${COM_TICKETLY_LOG_LEVEL:DEBUG}
+    org.springframework.security: ${SPRING_SECURITY_LOG_LEVEL:DEBUG}
+    org.springframework.data.mongodb.core.ReactiveMongoTemplate: ${MONGODB_LOG_LEVEL:DEBUG}
 
 aws:
   s3:
