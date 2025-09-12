@@ -16,18 +16,18 @@ spring:
   kafka:
     consumer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-      group-id: ${KAFKA_GROUP_ID:projection-service-group-v28}
+      group-id: ${KAFKA_GROUP_ID:event-query-service}
       auto-offset-reset: earliest
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.dpiyumal.me/realms/event-ticketing}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:https://auth.dpiyumal.me/realms/event-ticketing/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://auth.ticketly.com:8080/realms/event-ticketing/protocol/openid-connect/certs}
       client:
         provider:
           keycloak:
-            issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.dpiyumal.me/realms/event-ticketing}
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
         registration:
           # This client is used for M2M communication
           keycloak-m2m-client:
