@@ -35,16 +35,28 @@ public class SeatStatusConsumer {
             // Create update DTO for SSE
             SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.LOCKED);
 
-            // Update MongoDB first, then publish SSE event
+            // Update MongoDB first, then decide whether to publish SSE event based on success
             seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.LOCKED)
-                    .doOnSuccess(v -> log.info("Successfully updated seat status to LOCKED in MongoDB"))
+                    .doOnSuccess(success -> {
+                        if (success) {
+                            log.info("Successfully updated seat status to LOCKED in MongoDB");
+                        } else {
+                            log.warn("Failed to update seat status to LOCKED in MongoDB due to business rules");
+                        }
+                    })
                     .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
-                    .onErrorResume(e -> Mono.empty()) // Continue with SSE even if MongoDB update fails
-                    .then(Mono.fromRunnable(() -> {
-                        // Publish SSE event
-                        sseService.publish(update, payload.session_id());
-                        acknowledgment.acknowledge();
-                    }))
+                    .onErrorReturn(false)
+                    .flatMap(success -> {
+                        if (success) {
+                            // Only publish SSE event if MongoDB update was successful
+                            sseService.publish(update, payload.session_id());
+                            log.info("Published SSE event for LOCKED seats in session: {}", payload.session_id());
+                        } else {
+                            log.warn("Skipping SSE event publication due to failed MongoDB update for session: {}", payload.session_id());
+                        }
+                        return Mono.just(success);
+                    })
+                    .doFinally(signalType -> acknowledgment.acknowledge())
                     .subscribe();
         } catch (Exception e) {
             log.error("Error processing SeatsLocked event for session {}: {}", payload.session_id(), e.getMessage());
@@ -66,16 +78,28 @@ public class SeatStatusConsumer {
             // Create update DTO for SSE
             SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.AVAILABLE);
 
-            // Update MongoDB first, then publish SSE event
+            // Update MongoDB first, then decide whether to publish SSE event based on success
             seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.AVAILABLE)
-                    .doOnSuccess(v -> log.info("Successfully updated seat status to AVAILABLE in MongoDB"))
+                    .doOnSuccess(success -> {
+                        if (success) {
+                            log.info("Successfully updated seat status to AVAILABLE in MongoDB");
+                        } else {
+                            log.warn("Failed to update seat status to AVAILABLE in MongoDB due to business rules");
+                        }
+                    })
                     .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
-                    .onErrorResume(e -> Mono.empty()) // Continue with SSE even if MongoDB update fails
-                    .then(Mono.fromRunnable(() -> {
-                        // Publish SSE event
-                        sseService.publish(update, payload.session_id());
-                        acknowledgment.acknowledge();
-                    }))
+                    .onErrorReturn(false)
+                    .flatMap(success -> {
+                        if (success) {
+                            // Only publish SSE event if MongoDB update was successful
+                            sseService.publish(update, payload.session_id());
+                            log.info("Published SSE event for AVAILABLE seats in session: {}", payload.session_id());
+                        } else {
+                            log.warn("Skipping SSE event publication due to failed MongoDB update for session: {}", payload.session_id());
+                        }
+                        return Mono.just(success);
+                    })
+                    .doFinally(signalType -> acknowledgment.acknowledge())
                     .subscribe();
         } catch (Exception e) {
             log.error("Error processing SeatsReleased event for session {}: {}", payload.session_id(), e.getMessage());

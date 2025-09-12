@@ -1,13 +1,17 @@
 package com.ticketly.mseventseatingprojection.repository;
 
 
+import com.mongodb.client.result.UpdateResult;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -109,5 +113,38 @@ public class SeatRepositorImpl implements SeatRepository {
         );
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.SeatInfo.class);
+    }
+
+    @Override
+    public Mono<Boolean> areAnySeatsBooked(String sessionId, List<String> seatIds) {
+        // This query is optimized to stop searching as soon as it finds one match.
+        Query query = Query.query(
+                Criteria.where("sessions")
+                        .elemMatch(
+                                Criteria.where("id").is(sessionId)
+                                        .and("layoutData.layout.blocks.rows.seats.id").in(seatIds)
+                                        .and("layoutData.layout.blocks.rows.seats.status").is(ReadModelSeatStatus.BOOKED.toString())
+                        )
+        );
+        return reactiveMongoTemplate.exists(query, EventDocument.class);
+    }
+
+    public Mono<Long> updateSeatStatuses(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
+        // 1. Query: Find the event document containing the session.
+        Query query = Query.query(Criteria.where("sessions.id").is(sessionId));
+
+        // 2. Update: Define the update operation with arrayFilters.
+        Update update = new Update()
+                .set("sessions.$[sess].layoutData.layout.blocks.$[].rows.$[].seats.$[seat].status", newStatus.toString())
+                .set("sessions.$[sess].layoutData.layout.blocks.$[].seats.$[seat].status", newStatus.toString())
+                // Define the 'sess' identifier for the session filter
+                .filterArray("sess.id", sessionId)
+                // Define the 'seat' identifier for the seat ID filter
+                .filterArray(Criteria.where("seat.id").in(seatIds));
+
+        // 3. Execute: Run the update and return the result.
+        // Use updateMulti for safety, though we expect one document.
+        return reactiveMongoTemplate.updateMulti(query, update, EventDocument.class)
+                .map(UpdateResult::getModifiedCount);
     }
 }
