@@ -19,9 +19,9 @@ public class SeatStatusService {
     private final SeatRepository seatRepository;
 
 
-    public Mono<Void> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
+    public Mono<Boolean> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
         if (seatIds == null || seatIds.isEmpty()) {
-            return Mono.empty();
+            return Mono.just(false);
         }
 
         log.info("Attempting to update {} seats to status {} in session {}", seatIds.size(), newStatus, sessionId);
@@ -32,17 +32,19 @@ public class SeatStatusService {
                     // 2. Enforce the business rule
                     if (anyBooked) {
                         log.warn("Update failed: Attempted to change the status of an already BOOKED seat in session {}", sessionId);
-                        // Return an error indicating a business rule violation
-                        return Mono.error(new IllegalStateException("Cannot change the status of a seat that is already BOOKED."));
+                        // Return false indicating a business rule violation
+                        return Mono.just(false);
                     }
 
                     // 3. If the rule passes, proceed with the update
                     log.info("Validation passed. Proceeding with update for {} seats in session {}", seatIds.size(), sessionId);
-                    return seatRepository.updateSeatStatuses(sessionId, seatIds, newStatus);
-                }).then();
+                    return seatRepository.updateSeatStatuses(sessionId, seatIds, newStatus)
+                            .thenReturn(true)
+                            .onErrorReturn(false);
+                });
     }
 
-    public Mono<Void> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus newStatus) {
+    public Mono<Boolean> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus newStatus) {
         List<String> seatIdStrings = seatIds.stream()
                 .map(UUID::toString)
                 .collect(Collectors.toList());
