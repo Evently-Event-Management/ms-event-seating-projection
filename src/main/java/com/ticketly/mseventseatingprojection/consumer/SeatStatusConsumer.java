@@ -21,6 +21,13 @@ public class SeatStatusConsumer {
     private final SseService sseService;
     private final SeatStatusService seatStatusService;
 
+    /**
+     * Handles Kafka events for seats being locked.
+     * Updates seat status in MongoDB and publishes SSE event.
+     *
+     * @param payload The seat status change event payload.
+     * @param acknowledgment Kafka acknowledgment.
+     */
     @KafkaListener(topics = "ticketly.seats.locked")
     public void onSeatsLocked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
         log.info("Received SeatsLocked event for session: {}", payload.session_id());
@@ -57,6 +64,13 @@ public class SeatStatusConsumer {
         }
     }
 
+    /**
+     * Handles Kafka events for seats being released.
+     * Updates seat status in MongoDB and publishes SSE event.
+     *
+     * @param payload The seat status change event payload.
+     * @param acknowledgment Kafka acknowledgment.
+     */
     @KafkaListener(topics = "ticketly.seats.released")
     public void onSeatsReleased(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
         log.info("Received SeatsReleased event for session: {}", payload.session_id());
@@ -93,6 +107,13 @@ public class SeatStatusConsumer {
         }
     }
 
+    /**
+     * Handles Kafka events for seats being booked.
+     * Publishes SSE event for booked seats (no MongoDB update).
+     *
+     * @param payload The seat status change event payload.
+     * @param acknowledgment Kafka acknowledgment.
+     */
     @KafkaListener(topics = "ticketly.seats.booked")
     public void onSeatsBooked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
         log.info("Received SeatsBooked event for session: {}", payload.session_id());

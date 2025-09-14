@@ -19,11 +19,25 @@ import java.util.UUID;
 public class SeatService {
     private final SeatRepository seatRepository;
 
+    /**
+     * Validates the availability of the specified seats for a session.
+     *
+     * @param sessionId The ID of the session.
+     * @param request   The seat info request containing seat IDs and event ID.
+     * @return Mono emitting SeatValidationResponse.
+     */
     public Mono<SeatValidationResponse> validateSeatsAvailability(String sessionId, SeatInfoRequest request) {
         log.debug("validateSeatsAvailability called for sessionId={}, seatIds={}", sessionId, request.getSeat_ids());
         return seatRepository.validateSeatsAvailability(String.valueOf(request.getEvent_id()), sessionId, request.getSeat_ids());
     }
 
+    /**
+     * Retrieves detailed information for the specified seats in a session.
+     *
+     * @param sessionId The ID of the session.
+     * @param request   The seat info request containing seat IDs and event ID.
+     * @return Flux emitting SeatDetailsResponse for each seat.
+     */
     public Flux<SeatDetailsResponse> getSeatDetails(String sessionId, SeatInfoRequest request) {
         log.debug("getSeatDetails called for sessionId={}, seatIdsCount={}", sessionId, request.getSeat_ids().size());
         return seatRepository.findSeatDetails(String.valueOf(request.getEvent_id()), sessionId, request.getSeat_ids())

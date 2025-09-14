@@ -27,6 +27,21 @@ public class EventQueryService {
 
     private final EventReadRepositoryCustomImpl eventReadRepository;
 
+    /**
+     * Searches for events based on various filters and returns a paginated list of event thumbnails.
+     *
+     * @param searchTerm Search keyword for event title or description.
+     * @param categoryId Category ID to filter events.
+     * @param longitude  Longitude for location-based search.
+     * @param latitude   Latitude for location-based search.
+     * @param radiusKm   Radius in kilometers for location-based search.
+     * @param dateFrom   Start date filter.
+     * @param dateTo     End date filter.
+     * @param priceMin   Minimum price filter.
+     * @param priceMax   Maximum price filter.
+     * @param pageable   Pagination information.
+     * @return Mono emitting a page of EventThumbnailDTO.
+     */
     public Mono<Page<EventThumbnailDTO>> searchEvents(
             String searchTerm, String categoryId, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
@@ -125,6 +140,13 @@ public class EventQueryService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
     }
 
+    /**
+     * Fetches paginated basic session info for a given event ID.
+     *
+     * @param eventId  The ID of the event.
+     * @param pageable Pagination information.
+     * @return A Mono emitting a Page of SessionInfoDTO.
+     */
     public Mono<Page<SessionInfoDTO>> findSessionsBasicInfoByEventId(String eventId, Pageable pageable) {
         log.debug("findSessionsByEventId called for eventId={}, pageable={}", eventId, pageable);
         return eventReadRepository.findSessionsByEventId(eventId, pageable)
@@ -132,6 +154,12 @@ public class EventQueryService {
                 .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}", eventId, page.getNumberOfElements()));
     }
 
+    /**
+     * Maps EventDocument.SessionInfo to SessionInfoDTO.
+     *
+     * @param session The session info from the event document.
+     * @return The mapped SessionInfoDTO.
+     */
     private SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session) {
         SessionInfoDTO.VenueDetailsInfo venueDetailsDTO = null;
         if (session.getVenueDetails() != null) {

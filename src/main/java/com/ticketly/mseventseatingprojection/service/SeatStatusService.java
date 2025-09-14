@@ -18,7 +18,14 @@ public class SeatStatusService {
 
     private final SeatRepository seatRepository;
 
-
+    /**
+     * Updates the status of the specified seats for a given session.
+     *
+     * @param sessionId The ID of the session.
+     * @param seatIds   The list of seat IDs to update.
+     * @param newStatus The new status to set for the seats.
+     * @return Mono signaling completion.
+     */
     public Mono<Boolean> updateSeatStatus(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
         if (seatIds == null || seatIds.isEmpty()) {
             return Mono.just(false);
@@ -44,6 +51,14 @@ public class SeatStatusService {
                 });
     }
 
+    /**
+     * Updates the status of the specified seats for a given session using UUIDs.
+     *
+     * @param sessionId The UUID of the session.
+     * @param seatIds   The list of seat UUIDs to update.
+     * @param newStatus The new status to set for the seats.
+     * @return Mono signaling completion.
+     */
     public Mono<Boolean> updateSeatStatus(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus newStatus) {
         List<String> seatIdStrings = seatIds.stream()
                 .map(UUID::toString)

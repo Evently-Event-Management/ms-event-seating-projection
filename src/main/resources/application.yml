@@ -7,7 +7,6 @@ spring:
 
   webflux:
     base-path: /api/event-query
-
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating}
@@ -39,10 +38,10 @@ spring:
 
 logging:
   level:
-    root: INFO
-    com.ticketly: DEBUG
-    org.springframework.security: WARN
-    org.springframework.data.mongodb.core.ReactiveMongoTemplate: WARN
+    root: ${ROOT_LOG_LEVEL:INFO}
+    com.ticketly: ${COM_TICKETLY_LOG_LEVEL:DEBUG}
+    org.springframework.security: ${SPRING_SECURITY_LOG_LEVEL:DEBUG}
+    org.springframework.data.mongodb.core.ReactiveMongoTemplate: ${MONGODB_LOG_LEVEL:DEBUG}
 
 aws:
   s3:
@@ -62,3 +61,6 @@ springdoc:
 services:
   event-command:
     base-url: ${COMMAND_SERVICE_URL:http://localhost:8081/api/event-seating}
+
+webclient:
+    max-in-memory-size: ${WEBCLIENT_MAX_IN_MEMORY_SIZE:20971520} # 20MB

@@ -35,6 +35,13 @@ public class ProjectorService {
     private final SessionSeatingMapper sessionSeatingMapper;
     private final S3UrlGenerator s3UrlGenerator;
 
+
+    /**
+     * Projects the full event data into the read model for the given event ID.
+     *
+     * @param eventId The UUID of the event.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectFullEvent(UUID eventId) {
         log.info("Projecting full event for ID: {}", eventId);
         return eventProjectionClient.getEventProjectionData(eventId)
@@ -43,11 +50,24 @@ public class ProjectorService {
                 .then();
     }
 
+    /**
+     * Deletes the event from the read model for the given event ID.
+     *
+     * @param eventId The UUID of the event.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> deleteEvent(UUID eventId) {
         log.info("Deleting event {} from read model.", eventId);
         return eventRepository.deleteById(eventId.toString());
     }
 
+    /**
+     * Projects a session update for the given event and session IDs.
+     *
+     * @param eventId   The UUID of the event.
+     * @param sessionId The UUID of the session.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectSessionUpdate(UUID eventId, UUID sessionId) {
         log.info("Projecting session update for event ID: {} and session ID: {}", eventId, sessionId);
         return eventProjectionClient.getSessionProjectionData(sessionId)
@@ -56,8 +76,16 @@ public class ProjectorService {
                 .then();
     }
 
+    /**
+     * Projects a patch to the seating map for a session.
+     *
+     * @param eventId    The UUID of the event.
+     * @param sessionId  The UUID of the session.
+     * @param layoutJson The JSON string representing the seating map layout.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectSeatingMapPatch(UUID eventId, UUID sessionId, String layoutJson) {
-        log.info("Projecting seating map update for event ID: {} and session ID: {}", eventId, sessionId);
+        log.info("Projecting seating map patch for event ID: {} and session ID: {}", eventId, sessionId);
 
         return eventRepository.findById(eventId.toString())
                 .flatMap(eventDocument -> {
@@ -82,6 +110,12 @@ public class ProjectorService {
                 .then();
     }
 
+    /**
+     * Projects an organization change into the read model and updates embedded organization info in events.
+     *
+     * @param orgChange The organization change payload.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectOrganizationChange(OrganizationChangePayload orgChange) {
         log.info("Projecting organization change for ID: {}", orgChange.getId());
 
@@ -104,13 +138,24 @@ public class ProjectorService {
         return Mono.zip(saveOrgMono, updateEventsMono).then();
     }
 
+    /**
+     * Deletes the organization from the read model for the given organization ID.
+     *
+     * @param orgId The ID of the organization.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> deleteOrganization(String orgId) {
         log.info("Deleting organization {} from read model.", orgId);
         // In a real system, you might also trigger a process to handle events of a deleted organization
         return organizationRepository.deleteById(orgId);
     }
 
-    // ✅ NEW: Logic for handling category changes, moved from the consumer
+    /**
+     * Projects a category change into the read model and updates embedded category info in events.
+     *
+     * @param categoryId The UUID of the category.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectCategoryChange(UUID categoryId) {
         log.info("Projecting category change for ID: {}", categoryId);
         return eventProjectionClient.getCategoryProjectionData(categoryId)
@@ -139,6 +184,12 @@ public class ProjectorService {
                 .then();
     }
 
+    /**
+     * Deletes the category from the read model for the given category ID.
+     *
+     * @param catId The ID of the category.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> deleteCategory(String catId) {
         log.info("Deleting category {} from read model.", catId);
         // In a real system, you might trigger a process to re-categorize events
@@ -146,6 +197,13 @@ public class ProjectorService {
     }
 
 
+    /**
+     * Projects the addition of a cover photo to an event.
+     *
+     * @param eventId  The UUID of the event.
+     * @param photoKey The S3 key of the photo.
+     * @return Mono signaling completion.
+     */
     public Mono<Void> projectCoverPhotoAdded(UUID eventId, String photoKey) {
         log.info("Projecting cover photo addition for event ID: {}", eventId);
         // Transform the S3 key into a full, public URL
@@ -155,6 +213,10 @@ public class ProjectorService {
 
     /**
      * Handles removing a cover photo from an event document.
+     *
+     * @param eventId  The UUID of the event.
+     * @param photoKey The S3 key of the photo.
+     * @return Mono signaling completion.
      */
     public Mono<Void> projectCoverPhotoRemoved(UUID eventId, String photoKey) {
         log.info("Projecting cover photo removal for event ID: {}", eventId);

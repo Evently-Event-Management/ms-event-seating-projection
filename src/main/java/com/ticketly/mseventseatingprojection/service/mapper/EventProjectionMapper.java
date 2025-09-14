@@ -20,6 +20,12 @@ public class EventProjectionMapper {
 
     private final S3UrlGenerator s3UrlGenerator;
 
+    /**
+     * Maps an EventProjectionDTO to an EventDocument.
+     *
+     * @param dto the EventProjectionDTO to map
+     * @return the mapped EventDocument
+     */
     public EventDocument fromProjection(EventProjectionDTO dto) {
         if (dto == null) return null;
 
@@ -43,6 +49,12 @@ public class EventProjectionMapper {
                 .build();
     }
 
+    /**
+     * Maps a SessionProjectionDTO to an EventDocument.SessionInfo.
+     *
+     * @param dto the SessionProjectionDTO to map
+     * @return the mapped SessionInfo
+     */
     public EventDocument.SessionInfo fromSession(SessionProjectionDTO dto) {
         if (dto == null) return null;
         return EventDocument.SessionInfo.builder()

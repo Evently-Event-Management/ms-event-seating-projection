@@ -58,6 +58,14 @@ public class SeatRepositorImpl implements SeatRepository {
         public String unavailableSeatId;
     }
 
+    /**
+     * Validates the availability of the specified seats for a given event and session.
+     *
+     * @param eventId   The ID of the event.
+     * @param sessionId The ID of the session.
+     * @param seatIds   The list of seat IDs to validate.
+     * @return A Mono emitting a SeatValidationResponse indicating which seats are unavailable.
+     */
     @Override
     public Mono<SeatValidationResponse> validateSeatsAvailability(String eventId, String sessionId, List<String> seatIds) {
         // This query finds which of the requested seats are NOT available.
@@ -83,6 +91,14 @@ public class SeatRepositorImpl implements SeatRepository {
                         .build());
     }
 
+    /**
+     * Finds and returns detailed information for the specified seats in a session.
+     *
+     * @param eventId   The ID of the event.
+     * @param sessionId The ID of the session.
+     * @param seatIds   The list of seat IDs to retrieve details for.
+     * @return A Flux emitting EventDocument.SeatInfo for each requested seat.
+     */
     @Override
     public Flux<EventDocument.SeatInfo> findSeatDetails(String eventId, String sessionId, List<String> seatIds) {
         // This query finds and returns the full documents for the requested seats.

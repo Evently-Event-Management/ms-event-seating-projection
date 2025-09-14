@@ -11,6 +11,13 @@ import java.util.stream.Collectors;
 @Component
 public class SessionSeatingMapper {
 
+    /**
+     * Maps a SessionSeatingMapDTO and tier info map to an EventDocument.SessionSeatingMapInfo.
+     *
+     * @param dto the SessionSeatingMapDTO to map
+     * @param tierInfoMap the map of tier IDs to TierInfo
+     * @return the mapped SessionSeatingMapInfo
+     */
     public EventDocument.SessionSeatingMapInfo fromSessionMap(SessionSeatingMapDTO dto, Map<String, EventDocument.TierInfo> tierInfoMap) {
         if (dto == null) return null;
         return EventDocument.SessionSeatingMapInfo.builder()

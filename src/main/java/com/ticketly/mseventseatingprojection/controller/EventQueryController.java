@@ -29,6 +29,21 @@ public class EventQueryController {
 
     private final EventQueryService eventQueryService;
 
+    /**
+     * Search for events based on filters and pagination.
+     *
+     * @param searchTerm Search keyword.
+     * @param categoryId Category ID filter.
+     * @param longitude Longitude for location filter.
+     * @param latitude Latitude for location filter.
+     * @param radiusKm Radius in kilometers for location filter.
+     * @param dateFrom Start date filter.
+     * @param dateTo End date filter.
+     * @param priceMin Minimum price filter.
+     * @param priceMax Maximum price filter.
+     * @param pageable Pagination information.
+     * @return Mono emitting ResponseEntity with a page of EventThumbnailDTO.
+     */
     @GetMapping("/search")
     public Mono<ResponseEntity<Page<EventThumbnailDTO>>> searchEvents(
             @RequestParam(required = false) String searchTerm,
@@ -48,6 +63,12 @@ public class EventQueryController {
         ).map(ResponseEntity::ok);
     }
 
+    /**
+     * Get basic event info by event ID.
+     *
+     * @param eventId The event ID.
+     * @return Mono emitting ResponseEntity with EventBasicInfoDTO or not found.
+     */
     @GetMapping("/{eventId}/basic-info")
     public Mono<ResponseEntity<EventBasicInfoDTO>> getBasicEventInfo(@PathVariable String eventId) {
         return eventQueryService.getBasicEventInfo(eventId)
@@ -55,6 +76,13 @@ public class EventQueryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get sessions for an event, paginated.
+     *
+     * @param eventId The event ID.
+     * @param pageable Pagination information.
+     * @return Mono emitting ResponseEntity with a page of SessionInfoDTO or not found.
+     */
     @GetMapping("/{eventId}/sessions")
     public Mono<ResponseEntity<Page<SessionInfoDTO>>> getEventSessions(
             @PathVariable String eventId,
@@ -65,6 +93,14 @@ public class EventQueryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get sessions for an event within a date range.
+     *
+     * @param eventId The event ID.
+     * @param fromDate Start date.
+     * @param toDate End date.
+     * @return Mono emitting ResponseEntity with a list of SessionInfoDTO or not found.
+     */
     @GetMapping("/{eventId}/sessions/sessions-in-range")
     public Mono<ResponseEntity<List<SessionInfoDTO>>> getSessionsInRange(
             @PathVariable String eventId,
