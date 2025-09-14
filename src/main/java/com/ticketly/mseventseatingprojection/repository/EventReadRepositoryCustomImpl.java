@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.read.SessionStatusInfo;
 import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
 @Repository
 @RequiredArgsConstructor
 public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom {
@@ -40,6 +43,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable
     ) {
+        // Performs a complex search for events with multiple optional filters.
         if (categoryId != null) {
             return getCategoryCriteria(categoryId)
                     .flatMap(categoryCriteria -> executeAggregation(searchTerm, categoryCriteria, longitude, latitude,
@@ -51,6 +55,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<Criteria> getCategoryCriteria(String categoryId) {
+        // Builds a Criteria object for category filtering, including subcategories if present.
         return categoryReadRepository.findByParentId(categoryId)
                 .collectList()
                 .map(subcategories -> {
@@ -70,7 +75,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
             String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable) {
-
+        // Executes the aggregation pipeline for event search with all filters applied.
         List<AggregationOperation> pipeline = new ArrayList<>();
         List<Criteria> matchCriteriaList = new ArrayList<>();
 
@@ -80,7 +85,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         if (hasTextSearch && hasGeoSearch) {
             // OPTION 1: Use $text first, then filter by location in $match stage
-            pipeline.add(Aggregation.match(TextCriteria.forDefaultLanguage().matching(searchTerm)));
+            pipeline.add(match(TextCriteria.forDefaultLanguage().matching(searchTerm)));
 
             // Use $geoWithin $centerSphere instead of $nearSphere in aggregation
             Point userLocation = new Point(longitude, latitude);
@@ -92,7 +97,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         } else if (hasTextSearch) {
             // Only text search - must be first stage
-            pipeline.add(Aggregation.match(TextCriteria.forDefaultLanguage().matching(searchTerm)));
+            pipeline.add(match(TextCriteria.forDefaultLanguage().matching(searchTerm)));
         } else if (hasGeoSearch) {
             // Only geo search - can use $geoNear for distance calculation
             Point userLocation = new Point(longitude, latitude);
@@ -123,12 +128,12 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         matchCriteriaList.add(Criteria.where("status").is("APPROVED"));
 
         // Add remaining match criteria as a single $match stage
-        pipeline.add(Aggregation.match(new Criteria().andOperator(matchCriteriaList)));
+        pipeline.add(match(new Criteria().andOperator(matchCriteriaList)));
 
         // Rest of the pipeline remains the same
         List<AggregationOperation> countPipelineOps = new ArrayList<>(pipeline);
         countPipelineOps.add(Aggregation.count().as("total"));
-        TypedAggregation<Map> countAggregation = Aggregation.newAggregation(Map.class, countPipelineOps);
+        TypedAggregation<Map> countAggregation = newAggregation(Map.class, countPipelineOps);
 
         Mono<Long> countMono = reactiveMongoTemplate.aggregate(countAggregation, "events", Map.class)
                 .singleOrEmpty()
@@ -145,7 +150,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         pipeline.add(Aggregation.skip(pageable.getOffset()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
-        TypedAggregation<EventDocument> finalAggregation = Aggregation.newAggregation(EventDocument.class, pipeline);
+        TypedAggregation<EventDocument> finalAggregation = newAggregation(EventDocument.class, pipeline);
 
         return reactiveMongoTemplate.aggregate(finalAggregation, "events", EventDocument.class)
                 .collectList()
@@ -156,6 +161,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     // findEventBySessionId remains unchanged.
     @Override
     public Mono<EventDocument> findSessionBasicInfoById(String sessionId) {
+        // Finds the event document containing a session by session ID, excluding layout data.
         Query query = new Query(Criteria.where("sessions.id").is(sessionId));
         query.fields().exclude("sessions.layoutData");
         return reactiveMongoTemplate.findOne(
@@ -166,6 +172,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<EventDocument> findEventBasicInfoById(String eventId) {
+        // Finds basic event info by event ID, excluding sessions.
         Query query = new Query(Criteria.where("id").is(eventId).and("status").is("APPROVED"));
         query.fields().exclude("sessions");
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
@@ -173,13 +180,14 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable) {
+        // Finds sessions for a given event, paginated.
         // --- Aggregation Pipeline for Sessions ---
 
         // Stage 1: Match the parent event document by its ID.
-        AggregationOperation matchEvent = Aggregation.match(Criteria.where("_id").is(eventId));
+        AggregationOperation matchEvent = match(Criteria.where("_id").is(eventId));
 
         // Stage 2: Deconstruct the sessions array into a stream of documents.
-        AggregationOperation unwindSessions = Aggregation.unwind("sessions");
+        AggregationOperation unwindSessions = unwind("sessions");
 
         // Stage 3: Promote the session sub-document to the root level.
         AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
@@ -198,7 +206,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         // --- EXECUTION ---
         // Build the pipeline for fetching the paginated data.
-        TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(
+        TypedAggregation<EventDocument.SessionInfo> aggregation = newAggregation(
                 EventDocument.SessionInfo.class,
                 matchEvent,
                 unwindSessions,
@@ -218,6 +226,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId) {
+        // Finds the seating map for a specific session by its ID.
         return reactiveMongoTemplate.findOne(
                         new Query(Criteria.where("sessions.id").is(sessionId)),
                         EventDocument.class
@@ -233,14 +242,15 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
     @Override
     public Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
+        // Finds sessions for a given event within a date range.
         // Match the event by ID
-        AggregationOperation matchEvent = Aggregation.match(Criteria.where("_id").is(eventId));
+        AggregationOperation matchEvent = match(Criteria.where("_id").is(eventId));
 
         // Unwind the sessions array
-        AggregationOperation unwindSessions = Aggregation.unwind("sessions");
+        AggregationOperation unwindSessions = unwind("sessions");
 
         // Match sessions within the date range
-        AggregationOperation matchDateRange = Aggregation.match(Criteria.where("sessions.startTime").gte(fromDate).lte(toDate));
+        AggregationOperation matchDateRange = match(Criteria.where("sessions.startTime").gte(fromDate).lte(toDate));
 
         // Replace root to promote session sub-document
         AggregationOperation replaceRoot = Aggregation.replaceRoot("sessions");
@@ -252,7 +262,7 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         AggregationOperation sortByStartTime = Aggregation.sort(Sort.by(Sort.Direction.ASC, "startTime"));
 
         // Build the aggregation pipeline
-        TypedAggregation<EventDocument.SessionInfo> aggregation = Aggregation.newAggregation(
+        TypedAggregation<EventDocument.SessionInfo> aggregation = newAggregation(
                 EventDocument.SessionInfo.class,
                 matchEvent,
                 unwindSessions,
@@ -266,4 +276,24 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.SessionInfo.class);
     }
 
+    @Override
+    public Mono<SessionStatusInfo> findSessionStatusById(String sessionId) {
+        // Finds the status of a session by its ID.
+        // Build the aggregation pipeline to fetch only the necessary fields
+        Aggregation aggregation = newAggregation(
+                // Stage 1: Find the document containing the session
+                match(Criteria.where("sessions._id").is(sessionId)),
+                // Stage 2: Deconstruct the sessions array
+                unwind("sessions"),
+                // Stage 3: Keep only the specific session
+                match(Criteria.where("sessions._id").is(sessionId)),
+                // Stage 4: Project ONLY the fields you absolutely need
+                project()
+                        .and("_id").as("id") // Map the event ID
+                        .and("sessions.status").as("sessionStatus")
+        );
+
+        // Execute the query and expect a single result
+        return reactiveMongoTemplate.aggregate(aggregation, "events", SessionStatusInfo.class).next();
+    }
 }

@@ -20,6 +20,12 @@ public class SseController {
 
     private final SseService sseService;
 
+    /**
+     * Streams seat status updates for a session using Server-Sent Events (SSE).
+     *
+     * @param sessionId The UUID of the session.
+     * @return Flux of ServerSentEvent containing SeatStatusUpdateDto.
+     */
     @GetMapping(path = "/sessions/{sessionId}/seat-status", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<SeatStatusUpdateDto>> streamSeatStatus(@PathVariable UUID sessionId) {
         return sseService.register(sessionId);

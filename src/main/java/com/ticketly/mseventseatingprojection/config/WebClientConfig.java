@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.client.AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager;
@@ -11,6 +12,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
+    @Value("${webclient.max-in-memory-size:20971520}") // Default to 20MB if not set
+    private int size;
 
     @Bean
     public WebClient internalApiWebClient(ReactiveClientRegistrationRepository clientRegistrations) {
@@ -31,7 +34,6 @@ public class WebClientConfig {
         oauth2.setDefaultClientRegistrationId("keycloak-m2m-client");
 
         //Increased buffer size to handle larger payloads
-        final int size = 16 * 1024 * 1024;
         final ExchangeStrategies strategies = ExchangeStrategies.builder()
                 .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(size))
                 .build();

@@ -26,6 +26,12 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
 
     private final EventAnalyticsRepository eventAnalyticsRepository;
 
+    /**
+     * Retrieves analytics for a specific event, including revenue, ticket sales, session breakdown, and tier analytics.
+     *
+     * @param eventId the ID of the event
+     * @return a Mono emitting the EventAnalyticsDTO
+     */
     @Override
     public Mono<EventAnalyticsDTO> getEventAnalytics(String eventId) {
         // Get basic event info for title
@@ -71,13 +77,25 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
 
+    /**
+     * Retrieves analytics summaries for all sessions of a specific event.
+     *
+     * @param eventId the ID of the event
+     * @return a Flux emitting SessionSummaryDTOs for each session
+     */
     @Override
     public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
         return eventAnalyticsRepository.getAllSessionsAnalytics(eventId)
                 .switchIfEmpty(Flux.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
 
-
+    /**
+     * Retrieves detailed analytics for a specific session of an event, including revenue, seat status, and block occupancy.
+     *
+     * @param eventId the ID of the event
+     * @param sessionId the ID of the session
+     * @return a Mono emitting the SessionAnalyticsDTO
+     */
     @Override
     public Mono<SessionAnalyticsDTO> getSessionAnalytics(String eventId, String sessionId) {
         // Get session summary (base information)

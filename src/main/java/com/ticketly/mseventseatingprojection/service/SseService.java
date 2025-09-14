@@ -52,6 +52,7 @@ public class SseService {
      * This method is called by the Kafka consumer.
      *
      * @param update The seat status update DTO.
+     * @param sessionId The UUID of the session.
      */
     public void publish(SeatStatusUpdateDto update, UUID sessionId) {
         String sessionIdStr = sessionId.toString();
@@ -81,7 +82,9 @@ public class SseService {
     }
 
     /**
-     * Handles client disconnection.
+     * Handles client disconnection and cleans up resources if no subscribers remain.
+     *
+     * @param sessionId The session ID as a string.
      */
     private void handleDisconnect(String sessionId) {
         Sinks.Many<?> sink = sinks.get(sessionId);

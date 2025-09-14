@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.read.SessionStatusInfo;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,18 @@ public interface EventReadRepositoryCustom {
 
     /**
      * Performs a complex search for events with multiple optional filters.
+     *
+     * @param searchTerm Search keyword for event title or description.
+     * @param categoryId Category ID to filter events.
+     * @param longitude  Longitude for location-based search.
+     * @param latitude   Latitude for location-based search.
+     * @param radiusKm   Radius in kilometers for location-based search.
+     * @param dateFrom   Start date filter.
+     * @param dateTo     End date filter.
+     * @param priceMin   Minimum price filter.
+     * @param priceMax   Maximum price filter.
+     * @param pageable   Pagination information.
+     * @return Mono emitting a page of EventDocument.
      */
     Mono<Page<EventDocument>> searchEvents(
             String searchTerm,
@@ -30,17 +43,57 @@ public interface EventReadRepositoryCustom {
             Pageable pageable
     );
 
+    /**
+     * Builds a Criteria object for category filtering, including subcategories if present.
+     *
+     * @param categoryId The category ID to filter by.
+     * @return Mono emitting the Criteria for category filtering.
+     */
     Mono<Criteria> getCategoryCriteria(String categoryId);
 
+    /**
+     * Executes the aggregation pipeline for event search with all filters applied.
+     *
+     * @param searchTerm      Search keyword.
+     * @param categoryCriteria Criteria for category filtering.
+     * @param longitude       Longitude for location-based search.
+     * @param latitude        Latitude for location-based search.
+     * @param radiusKm        Radius in kilometers for location-based search.
+     * @param dateFrom        Start date filter.
+     * @param dateTo          End date filter.
+     * @param priceMin        Minimum price filter.
+     * @param priceMax        Maximum price filter.
+     * @param pageable        Pagination information.
+     * @return Mono emitting a page of EventDocument.
+     */
     Mono<Page<EventDocument>> executeAggregation(
             String searchTerm, Criteria categoryCriteria, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
             BigDecimal priceMin, BigDecimal priceMax, Pageable pageable);
 
+    /**
+     * Finds the event document containing a session by session ID, excluding layout data.
+     *
+     * @param sessionId The session ID to search for.
+     * @return Mono emitting the EventDocument with session info.
+     */
     Mono<EventDocument> findSessionBasicInfoById(String sessionId);
 
+    /**
+     * Finds basic event info by event ID, excluding sessions.
+     *
+     * @param eventId The event ID to search for.
+     * @return Mono emitting the EventDocument with basic info.
+     */
     Mono<EventDocument> findEventBasicInfoById(String eventId);
 
+    /**
+     * Finds sessions for a given event, paginated.
+     *
+     * @param eventId  The event ID.
+     * @param pageable Pagination information.
+     * @return Mono emitting a page of SessionInfo.
+     */
     Mono<Page<EventDocument.SessionInfo>> findSessionsByEventId(String eventId, Pageable pageable);
 
     /**
@@ -51,5 +104,21 @@ public interface EventReadRepositoryCustom {
      */
     Mono<EventDocument.SessionSeatingMapInfo> findSeatingMapBySessionId(String sessionId);
 
+    /**
+     * Finds sessions for a given event within a date range.
+     *
+     * @param eventId  The event ID.
+     * @param fromDate Start date.
+     * @param toDate   End date.
+     * @return Flux emitting SessionInfo for each session in range.
+     */
     Flux<EventDocument.SessionInfo> findSessionsInRange(String eventId, Instant fromDate, Instant toDate);
+
+    /**
+     * Finds the status of a session by its ID.
+     *
+     * @param sessionId The session ID.
+     * @return Mono emitting SessionStatusInfo for the session.
+     */
+    Mono<SessionStatusInfo> findSessionStatusById(String sessionId);
 }
