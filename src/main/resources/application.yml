@@ -7,7 +7,6 @@ spring:
 
   webflux:
     base-path: /api/event-query
-
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating}
@@ -62,3 +61,6 @@ springdoc:
 services:
   event-command:
     base-url: ${COMMAND_SERVICE_URL:http://localhost:8081/api/event-seating}
+
+webclient:
+    max-in-memory-size: ${WEBCLIENT_MAX_IN_MEMORY_SIZE:20971520} # 20MB
