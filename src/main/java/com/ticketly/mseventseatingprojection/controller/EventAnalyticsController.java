@@ -7,7 +7,10 @@ import com.ticketly.mseventseatingprojection.service.EventAnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,7 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/v1/analytics")
 @RequiredArgsConstructor
 @Tag(name = "Event Analytics", description = "APIs for event and session analytics")
+@Slf4j
 public class EventAnalyticsController {
 
     private final EventAnalyticsService eventAnalyticsService;
@@ -32,8 +36,9 @@ public class EventAnalyticsController {
     @GetMapping("/events/{eventId}")
     @Operation(summary = "Get comprehensive analytics for an event",
             description = "Returns aggregated analytics across all sessions including revenue, tickets sold, and capacity metrics")
-    public Mono<ResponseEntity<EventAnalyticsDTO>> getEventAnalytics(@PathVariable String eventId) {
-        return eventAnalyticsService.getEventAnalytics(eventId)
+    public Mono<ResponseEntity<EventAnalyticsDTO>> getEventAnalytics(@PathVariable String eventId, @AuthenticationPrincipal Jwt jwt) {
+        log.info("User {} requested analytics for event {}", jwt.getSubject(), eventId);
+        return eventAnalyticsService.getEventAnalytics(eventId, jwt.getSubject())
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
@@ -47,8 +52,9 @@ public class EventAnalyticsController {
     @GetMapping("/events/{eventId}/sessions")
     @Operation(summary = "Get basic analytics for all sessions in an event",
             description = "Returns basic analytics for each session including revenue, tickets sold, and capacity")
-    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(@PathVariable String eventId) {
-        return eventAnalyticsService.getAllSessionsAnalytics(eventId);
+    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(@PathVariable String eventId, @AuthenticationPrincipal Jwt jwt) {
+        log.info("User {} requested session summaries for event {}", jwt.getSubject(), eventId);
+        return eventAnalyticsService.getAllSessionsAnalytics(eventId, jwt.getSubject());
     }
 
     /**
@@ -63,8 +69,10 @@ public class EventAnalyticsController {
             description = "Returns detailed analytics for a specific session including revenue, capacity, and seat status breakdown")
     public Mono<ResponseEntity<SessionAnalyticsDTO>> getSessionAnalytics(
             @PathVariable String eventId,
-            @PathVariable String sessionId) {
-        return eventAnalyticsService.getSessionAnalytics(eventId, sessionId)
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal Jwt jwt) {
+        log.info("User {} requested analytics for session {} of event {}", jwt.getSubject(), sessionId, eventId);
+        return eventAnalyticsService.getSessionAnalytics(eventId, sessionId , jwt.getSubject())
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

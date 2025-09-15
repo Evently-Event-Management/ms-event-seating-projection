@@ -135,6 +135,7 @@ public class EventProjectionMapper {
                 .id(dto.getId().toString())
                 .name(dto.getName())
                 .logoUrl(s3UrlGenerator.generatePublicUrl(dto.getLogoUrl()))
+                .userId(dto.getUserId())
                 .build();
     }
 

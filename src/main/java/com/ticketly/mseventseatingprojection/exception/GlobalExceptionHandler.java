@@ -44,7 +44,6 @@ public class GlobalExceptionHandler extends AbstractErrorWebExceptionHandler {
 
     private Mono<ServerResponse> renderErrorResponse(ServerRequest request) {
         Throwable error = getError(request);
-        log.error("Error occurred: {}", error.getMessage(), error);
 
         // Extract path from request
         String path = request.uri().getPath();
@@ -52,7 +51,12 @@ public class GlobalExceptionHandler extends AbstractErrorWebExceptionHandler {
         // Handle different types of exceptions
         switch (error) {
             case ResourceNotFoundException resourceNotFoundException -> {
+                log.info("Resource not found: {}", error.getMessage());
                 return buildErrorResponse(HttpStatus.NOT_FOUND, error.getMessage(), path, null);
+            }
+            case UnauthorizedAccessException unauthorizedAccessException -> {
+                log.warn("Unauthorized access attempt: {}", error.getMessage()); // <-- CHANGED
+                return buildErrorResponse(HttpStatus.FORBIDDEN, error.getMessage(), path, null);
             }
             case WebExchangeBindException ex -> {
                 Map<String, String> validationErrors = new HashMap<>();
@@ -78,7 +82,7 @@ public class GlobalExceptionHandler extends AbstractErrorWebExceptionHandler {
                 );
             }
             default -> {
-                // For any other exceptions
+                log.error("An unexpected error occurred at path '{}'", path, error); // <-- KEEP STACK TRACE HERE
                 return buildErrorResponse(
                         HttpStatus.INTERNAL_SERVER_ERROR,
                         "An unexpected error occurred",

@@ -105,4 +105,26 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     @Query("{ '_id': ?0 }")
     @Update("{ '$pull': { 'coverPhotos': ?1 } }")
     Mono<Long> removeCoverPhotoFromEvent(String eventId, String photoUrl);
+
+
+    /**
+     * Quickly checks the ownership of an event by fetching only the organization's userId.
+     * This is highly efficient as it avoids loading the entire event document.
+     *
+     * @param eventId The ID of the event to check.
+     * @return A Mono emitting the EventDocument containing ONLY the _id and organization.userId fields.
+     */
+    @Query(value = "{ '_id': ?0 }", fields = "{ 'organization.userId': 1 }")
+    Mono<EventDocument> findOwnerIdByEventId(String eventId);
+
+
+    /**
+     * Quickly fetches an event's title by its ID using a projection.
+     * Spring Data will automatically implement this method.
+     *
+     * @param eventId The ID of the event to find.
+     * @return A Mono emitting the EventDocument containing ONLY the _id and title fields.
+     */
+    @Query(value = "{ 'id': ?0 }", fields = "{ 'title': 1 }")
+    Mono<EventDocument> findEventTitleById(String eventId);
 }

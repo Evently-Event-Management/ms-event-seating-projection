@@ -121,7 +121,7 @@ public class ProjectorService {
 
         // 1. Upsert the document in the 'organizations' collection
         OrganizationDocument orgDoc = OrganizationDocument.builder()
-                .id(orgChange.getId().toString()).name(orgChange.getName())
+                .id(orgChange.getId().toString()).name(orgChange.getName()).userId(orgChange.getUserId())
                 .logoUrl(s3UrlGenerator.generatePublicUrl(orgChange.getLogoUrl())).website(orgChange.getWebsite()).build();
 
         Mono<OrganizationDocument> saveOrgMono = organizationRepository.save(orgDoc)
@@ -129,7 +129,7 @@ public class ProjectorService {
 
         // 2. Trigger a bulk update for all events that embed this organization's info
         EventDocument.OrganizationInfo embeddedInfo = EventDocument.OrganizationInfo.builder()
-                .id(orgChange.getId().toString()).name(orgChange.getName()).logoUrl(s3UrlGenerator.generatePublicUrl(orgChange.getLogoUrl())).build();
+                .id(orgChange.getId().toString()).name(orgChange.getName()).logoUrl(s3UrlGenerator.generatePublicUrl(orgChange.getLogoUrl())).userId(orgChange.getUserId()).build();
 
         Mono<Long> updateEventsMono = eventRepository.updateOrganizationInfoInEvents(orgChange.getId().toString(), embeddedInfo)
                 .doOnSuccess(count -> log.info("Updated embedded organization info for {} events.", count));
