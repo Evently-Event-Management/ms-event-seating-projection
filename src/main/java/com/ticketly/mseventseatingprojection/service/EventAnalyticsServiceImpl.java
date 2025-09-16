@@ -5,9 +5,11 @@ import com.ticketly.mseventseatingprojection.dto.analytics.raw.EventOverallStats
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SeatStatusCountDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.raw.SessionStatusCountDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
+import com.ticketly.mseventseatingprojection.exception.UnauthorizedAccessException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventAnalyticsRepository;
+import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import model.SessionStatus;
@@ -25,17 +27,14 @@ import java.util.*;
 public class EventAnalyticsServiceImpl implements EventAnalyticsService {
 
     private final EventAnalyticsRepository eventAnalyticsRepository;
+    private final EventOwnershipService eventOwnershipService;
+    private final EventRepository eventRepository;
 
-    /**
-     * Retrieves analytics for a specific event, including revenue, ticket sales, session breakdown, and tier analytics.
-     *
-     * @param eventId the ID of the event
-     * @return a Mono emitting the EventAnalyticsDTO
-     */
+
     @Override
     public Mono<EventAnalyticsDTO> getEventAnalytics(String eventId) {
         // Get basic event info for title
-        Mono<String> eventTitleMono = eventAnalyticsRepository.findEventTitleById(eventId)
+        Mono<String> eventTitleMono = eventRepository.findEventTitleById(eventId)
                 .map(EventDocument::getTitle)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
 
@@ -77,25 +76,37 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
 
-    /**
-     * Retrieves analytics summaries for all sessions of a specific event.
-     *
-     * @param eventId the ID of the event
-     * @return a Flux emitting SessionSummaryDTOs for each session
-     */
+    @Override
+    public Mono<EventAnalyticsDTO> getEventAnalytics(String eventId, String userId) {
+        return eventOwnershipService.isUserOwnerOfEvent(userId, eventId)
+                .flatMap(isOwner -> {
+                    if (isOwner) {
+                        return getEventAnalytics(eventId);
+                    } else {
+                        return Mono.error(new UnauthorizedAccessException("Event analytics", eventId, userId));
+                    }
+                });
+    }
+
     @Override
     public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId) {
         return eventAnalyticsRepository.getAllSessionsAnalytics(eventId)
                 .switchIfEmpty(Flux.error(new ResourceNotFoundException("Event not found with ID: " + eventId)));
     }
 
-    /**
-     * Retrieves detailed analytics for a specific session of an event, including revenue, seat status, and block occupancy.
-     *
-     * @param eventId the ID of the event
-     * @param sessionId the ID of the session
-     * @return a Mono emitting the SessionAnalyticsDTO
-     */
+
+    @Override
+    public Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId, String userId) {
+        return eventOwnershipService.isUserOwnerOfEvent(userId, eventId)
+                .flatMapMany(isOwner -> {
+                    if (isOwner) {
+                        return getAllSessionsAnalytics(eventId);
+                    } else {
+                        return Flux.error(new UnauthorizedAccessException("Event sessions analytics", eventId, userId));
+                    }
+                });
+    }
+
     @Override
     public Mono<SessionAnalyticsDTO> getSessionAnalytics(String eventId, String sessionId) {
         // Get session summary (base information)
@@ -156,6 +167,18 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                             .seatStatusBreakdown(seatStatusCounts)
                             .occupancyByBlock(blockOccupancy)
                             .build();
+                });
+    }
+
+    @Override
+    public Mono<SessionAnalyticsDTO> getSessionAnalytics(String eventId, String sessionId, String userId) {
+        return eventOwnershipService.isUserOwnerOfEvent(userId, eventId)
+                .flatMap(isOwner -> {
+                    if (isOwner) {
+                        return getSessionAnalytics(eventId, sessionId);
+                    } else {
+                        return Mono.error(new UnauthorizedAccessException("Session analytics", sessionId, userId));
+                    }
                 });
     }
 }

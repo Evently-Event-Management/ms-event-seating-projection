@@ -14,4 +14,5 @@ public class OrganizationDocument {
     private String name;
     private String logoUrl;
     private String website;
+    private String userId;
 }

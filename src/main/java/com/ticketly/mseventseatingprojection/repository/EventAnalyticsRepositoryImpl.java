@@ -83,13 +83,6 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     }
 
     @Override
-    public Mono<EventDocument> findEventTitleById(String eventId) {
-        Query query = new Query(Criteria.where("id").is(eventId));
-        query.fields().include("title");
-        return reactiveMongoTemplate.findOne(query, EventDocument.class);
-    }
-
-    @Override
     public Mono<EventDocument> findSessionWithCompleteSeatingData(String eventId, String sessionId) {
         Query query = new Query(
                 Criteria.where("id").is(eventId)

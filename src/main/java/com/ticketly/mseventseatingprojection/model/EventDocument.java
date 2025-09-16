@@ -45,6 +45,7 @@ public class EventDocument {
         private String id;
         private String name;
         private String logoUrl;
+        private String userId;
     }
 
     @Data

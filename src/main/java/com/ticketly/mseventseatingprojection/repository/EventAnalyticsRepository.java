@@ -65,13 +65,6 @@ public interface EventAnalyticsRepository {
      */
     Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId);
 
-    /**
-     * Find only the event title by event ID
-     *
-     * @param eventId The ID of the event
-     * @return A Mono containing the event document with only the title field
-     */
-    Mono<EventDocument> findEventTitleById(String eventId);
 
     /**
      * Get summaries for all sessions of an event using aggregation
