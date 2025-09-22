@@ -1,7 +1,6 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
 import com.ticketly.mseventseatingprojection.model.EventDocument;
-import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
 import dto.projection.*;
 import dto.projection.discount.BogoDiscountParamsProjectionDTO;
@@ -20,6 +19,7 @@ import java.util.stream.Collectors;
 public class EventProjectionMapper {
 
     private final S3UrlGenerator s3UrlGenerator;
+    private final SeatingMapMapper seatingMapMapper;
 
     /**
      * Maps an EventProjectionDTO to an EventDocument.
@@ -47,6 +47,7 @@ public class EventProjectionMapper {
                 .category(fromCategory(dto.getCategory()))
                 .tiers(mapList(dto.getTiers(), this::fromTier))
                 .sessions(mapList(dto.getSessions(), this::fromSession))
+                .discounts(mapList(dto.getDiscounts(), this::fromDiscount))
                 .build();
     }
 
@@ -65,7 +66,7 @@ public class EventProjectionMapper {
                 .status(dto.getSessionStatus())
                 .salesStartTime(dto.getSalesStartTime().toInstant())
                 .sessionType(dto.getSessionType())
-                .layoutData(fromSeatingMap(dto.getLayoutData()))
+                .layoutData(seatingMapMapper.fromProjection(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))
                 .build();
     }
@@ -111,66 +112,6 @@ public class EventProjectionMapper {
             case null, default -> null;
         };
 
-    }
-
-    private EventDocument.SessionSeatingMapInfo fromSeatingMap(SeatingMapProjectionDTO dto) {
-        if (dto == null) return null;
-        return EventDocument.SessionSeatingMapInfo.builder()
-                .name(dto.getName())
-                .layout(fromLayout(dto.getLayout()))
-                .build();
-    }
-
-    private EventDocument.LayoutInfo fromLayout(SeatingMapProjectionDTO.LayoutInfo dto) {
-        if (dto == null) return null;
-        return EventDocument.LayoutInfo.builder()
-                .blocks(mapList(dto.getBlocks(), this::fromBlock))
-                .build();
-    }
-
-    private EventDocument.BlockInfo fromBlock(SeatingMapProjectionDTO.BlockInfo dto) {
-        if (dto == null) return null;
-        return EventDocument.BlockInfo.builder()
-                .id(dto.getId())
-                .name(dto.getName())
-                .type(dto.getType())
-                .position(fromPosition(dto.getPosition()))
-                .rows(mapList(dto.getRows(), this::fromRow))
-                .seats(mapList(dto.getSeats(), this::fromSeat))
-                .capacity(dto.getCapacity())
-                .width(dto.getWidth())
-                .height(dto.getHeight())
-                .build();
-    }
-
-    private EventDocument.RowInfo fromRow(SeatingMapProjectionDTO.RowInfo dto) {
-        if (dto == null) return null;
-        return EventDocument.RowInfo.builder()
-                .id(dto.getId())
-                .label(dto.getLabel())
-                .seats(mapList(dto.getSeats(), this::fromSeat))
-                .build();
-    }
-
-    private EventDocument.SeatInfo fromSeat(SeatingMapProjectionDTO.SeatInfo dto) {
-        if (dto == null) return null;
-
-        ReadModelSeatStatus status = null;
-        if (dto.getStatus() != null) {
-            try {
-                status = ReadModelSeatStatus.valueOf(dto.getStatus().toString().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                // Handle cases where the string might be invalid, default to AVAILABLE
-                status = ReadModelSeatStatus.AVAILABLE;
-            }
-        }
-
-        return EventDocument.SeatInfo.builder()
-                .id(dto.getId())
-                .label(dto.getLabel())
-                .status(status)
-                .tier(fromTier(dto.getTier()))
-                .build();
     }
 
     private EventDocument.OrganizationInfo fromOrganization(EventProjectionDTO.OrganizationInfo dto) {

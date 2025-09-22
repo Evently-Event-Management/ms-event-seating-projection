@@ -9,7 +9,7 @@ import com.ticketly.mseventseatingprojection.repository.CategoryRepository;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.repository.OrganizationRepository;
 import com.ticketly.mseventseatingprojection.service.mapper.EventProjectionMapper;
-import com.ticketly.mseventseatingprojection.service.mapper.SessionSeatingMapper;
+import com.ticketly.mseventseatingprojection.service.mapper.SeatingMapMapper;
 import dto.SessionSeatingMapDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +28,11 @@ public class ProjectorService {
 
     private final EventProjectionClient eventProjectionClient;
     private final EventRepository eventRepository;
-    private final OrganizationRepository organizationRepository; // ✅ Added repository
-    private final CategoryRepository categoryRepository;     // ✅ Added repository
+    private final OrganizationRepository organizationRepository;
+    private final CategoryRepository categoryRepository;
     private final ObjectMapper objectMapper;
     private final EventProjectionMapper eventProjectionMapper;
-    private final SessionSeatingMapper sessionSeatingMapper;
+    private final SeatingMapMapper seatingMapMapper;
     private final S3UrlGenerator s3UrlGenerator;
 
 
@@ -97,7 +97,7 @@ public class ProjectorService {
                                 .collect(Collectors.toMap(EventDocument.TierInfo::getId, Function.identity()));
 
                         EventDocument.SessionSeatingMapInfo seatingMapInfo =
-                                sessionSeatingMapper.fromSessionMap(seatingMapDto, tierInfoMap);
+                                seatingMapMapper.fromSessionMap(seatingMapDto, tierInfoMap);
 
                         return eventRepository.updateSeatingMapInSession(
                                 eventId.toString(), sessionId.toString(), seatingMapInfo
