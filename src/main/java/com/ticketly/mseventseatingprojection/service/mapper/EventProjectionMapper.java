@@ -4,7 +4,10 @@ import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
 import dto.projection.*;
+import dto.projection.discount.BogoDiscountParamsProjectionDTO;
 import dto.projection.discount.DiscountParametersProjectionDTO;
+import dto.projection.discount.FlatOffDiscountParamsProjectionDTO;
+import dto.projection.discount.PercentageDiscountParamsProjectionDTO;
 import lombok.AllArgsConstructor;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.stereotype.Component;
@@ -88,18 +91,18 @@ public class EventProjectionMapper {
 
     private EventDocument.DiscountParametersInfo fromDiscountParameters(DiscountParametersProjectionDTO dto) {
         return switch (dto) {
-            case dto.projection.discount.PercentageDiscountParamsProjectionDTO p ->
+            case PercentageDiscountParamsProjectionDTO p ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(p.getType())
                             .percentage(p.getPercentage())
                             .build();
-            case dto.projection.discount.FlatOffDiscountParamsProjectionDTO f ->
+            case FlatOffDiscountParamsProjectionDTO f ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(f.getType())
                             .amount(f.getAmount())
                             .currency(f.getCurrency())
                             .build();
-            case dto.projection.discount.BogoDiscountParamsProjectionDTO b ->
+            case BogoDiscountParamsProjectionDTO b ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(b.getType())
                             .buyQuantity(b.getBuyQuantity())
