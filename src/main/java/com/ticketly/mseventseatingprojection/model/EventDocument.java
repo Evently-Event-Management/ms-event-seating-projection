@@ -5,6 +5,7 @@ import lombok.Data;
 import model.EventStatus;
 import model.SessionStatus;
 import model.SessionType;
+import model.DiscountType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.index.*;
@@ -36,8 +37,34 @@ public class EventDocument {
     private CategoryInfo category;
     private List<TierInfo> tiers;
     private List<SessionInfo> sessions;
+    private List<DiscountInfo> discounts;
 
     // --- Embedded Sub-documents ---
+
+    @Data
+    @Builder
+    public static class DiscountInfo {
+        private String id;
+        private String code;
+        private DiscountParametersInfo parameters;
+        private Integer maxUsage;
+        private Integer currentUsage;
+        private Instant activeFrom;
+        private Instant expiresAt;
+        private List<String> applicableTierIds;
+        private List<String> applicableSessionIds;
+    }
+
+    @Data
+    @Builder
+    public static class DiscountParametersInfo {
+        private DiscountType type;
+        private BigDecimal percentage;
+        private BigDecimal amount;
+        private String currency;
+        private Integer buyQuantity;
+        private Integer getQuantity;
+    }
 
     @Data
     @Builder

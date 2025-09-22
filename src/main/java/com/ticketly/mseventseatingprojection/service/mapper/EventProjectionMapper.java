@@ -3,10 +3,8 @@ package com.ticketly.mseventseatingprojection.service.mapper;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
-import dto.projection.EventProjectionDTO;
-import dto.projection.SeatingMapProjectionDTO;
-import dto.projection.SessionProjectionDTO;
-import dto.projection.TierInfo;
+import dto.projection.*;
+import dto.projection.discount.DiscountParametersProjectionDTO;
 import lombok.AllArgsConstructor;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.stereotype.Component;
@@ -67,6 +65,49 @@ public class EventProjectionMapper {
                 .layoutData(fromSeatingMap(dto.getLayoutData()))
                 .venueDetails(fromVenue(dto.getVenueDetails()))
                 .build();
+    }
+
+    private EventDocument.DiscountInfo fromDiscount(DiscountProjectionDTO dto) {
+        if (dto == null) return null;
+        return EventDocument.DiscountInfo.builder()
+                .id(dto.getId().toString())
+                .code(dto.getCode())
+                .parameters(fromDiscountParameters(dto.getParameters()))
+                .maxUsage(dto.getMaxUsage())
+                .currentUsage(dto.getCurrentUsage())
+                .activeFrom(dto.getActiveFrom() != null ? dto.getActiveFrom().toInstant() : null)
+                .expiresAt(dto.getExpiresAt() != null ? dto.getExpiresAt().toInstant() : null)
+                .applicableTierIds(dto.getApplicableTierIds() != null
+                        ? dto.getApplicableTierIds().stream().map(Object::toString).collect(Collectors.toList())
+                        : null)
+                .applicableSessionIds(dto.getApplicableSessionIds() != null
+                        ? dto.getApplicableSessionIds().stream().map(Object::toString).collect(Collectors.toList())
+                        : null)
+                .build();
+    }
+
+    private EventDocument.DiscountParametersInfo fromDiscountParameters(DiscountParametersProjectionDTO dto) {
+        return switch (dto) {
+            case dto.projection.discount.PercentageDiscountParamsProjectionDTO p ->
+                    EventDocument.DiscountParametersInfo.builder()
+                            .type(p.getType())
+                            .percentage(p.getPercentage())
+                            .build();
+            case dto.projection.discount.FlatOffDiscountParamsProjectionDTO f ->
+                    EventDocument.DiscountParametersInfo.builder()
+                            .type(f.getType())
+                            .amount(f.getAmount())
+                            .currency(f.getCurrency())
+                            .build();
+            case dto.projection.discount.BogoDiscountParamsProjectionDTO b ->
+                    EventDocument.DiscountParametersInfo.builder()
+                            .type(b.getType())
+                            .buyQuantity(b.getBuyQuantity())
+                            .getQuantity(b.getGetQuantity())
+                            .build();
+            case null, default -> null;
+        };
+
     }
 
     private EventDocument.SessionSeatingMapInfo fromSeatingMap(SeatingMapProjectionDTO dto) {
