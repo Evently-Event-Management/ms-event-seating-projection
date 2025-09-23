@@ -38,7 +38,10 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.session_seating_maps",
             "dbz.ticketly.public.organizations",
             "dbz.ticketly.public.categories",
-            "dbz.ticketly.public.event_cover_photos"
+            "dbz.ticketly.public.event_cover_photos",
+            "dbz.ticketly.public.discounts",
+            "dbz.ticketly.public.discount_tiers",
+            "dbz.ticketly.public.discount_sessions"
     },
             containerFactory = "debeziumListenerContainerFactory"
     )
@@ -76,6 +79,12 @@ public class DebeziumEventConsumer {
             } else if (topic.endsWith(".event_cover_photos")) {
                 log.debug("Dispatching to processCoverPhotoChange for topic {}", topic);
                 processCoverPhotoChange(payload, processingFuture);
+            } else if (topic.endsWith(".discounts")) {
+                log.debug("Dispatching to processDiscountMetadataChange for topic {}", topic);
+                processDiscountMetadataChange(payload, processingFuture); // ✅ RENAMED
+            } else if (topic.endsWith(".discount_tiers") || topic.endsWith(".discount_sessions")) {
+                log.debug("Dispatching to processDiscountRelationshipChange for topic {}", topic);
+                processDiscountRelationshipChange(payload, processingFuture);
             } else {
                 log.warn("Unhandled topic: {}", topic);
                 acknowledgment.acknowledge(); // Safe to acknowledge for unhandled topics
@@ -347,6 +356,69 @@ public class DebeziumEventConsumer {
                         return Mono.empty();
                     }
                 })
+                .subscribe();
+    }
+
+    private void processDiscountMetadataChange(String payload, CompletableFuture<?> future) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        String operation = message.path("op").asText();
+
+        // Deletion still needs to be handled
+        if ("d".equals(operation)) {
+            DiscountMetadataChangePayload discountChange = objectMapper.treeToValue(message.path("before"), DiscountMetadataChangePayload.class);
+            projectorService.projectDiscountDeletion(discountChange.getEventId(), discountChange.getId())
+                    .doOnSuccess(v -> future.complete(null))
+                    .doOnError(e -> handleProjectionError(e, future))
+                    .subscribe();
+            return;
+        }
+
+        // For Create/Update, we patch
+        DiscountMetadataChangePayload discountChange = objectMapper.treeToValue(message.path("after"), DiscountMetadataChangePayload.class);
+
+        eventReadRepository.existsById(discountChange.getEventId().toString())
+                .flatMap(exists -> {
+                    if (exists) {
+                        return projectorService.patchDiscount(discountChange)
+                                .doOnSuccess(v -> future.complete(null))
+                                .doOnError(e -> handleProjectionError(e, future));
+                    }
+                    future.complete(null); // Parent event doesn't exist, skip.
+                    return Mono.empty();
+                }).subscribe();
+    }
+
+    /**
+     * STRATEGY 1: Handles structural changes from join tables ('discount_tiers', 'discount_sessions').
+     * This triggers a full "Signal and Fetch" of the affected discount to ensure consistency.
+     */
+    private void processDiscountRelationshipChange(String payload, CompletableFuture<?> future) throws Exception {
+        JsonNode message = objectMapper.readTree(payload).path("payload");
+        JsonNode dataNode = message.path("op").asText().equals("d") ? message.path("before") : message.path("after");
+        if (dataNode.isMissingNode()) {
+            future.complete(null);
+            return;
+        }
+
+        DiscountJoinTablePayload joinChange = objectMapper.treeToValue(dataNode, DiscountJoinTablePayload.class);
+        UUID discountId = joinChange.getDiscountId();
+
+        // We need to find the parent event ID from the discount ID.
+        eventReadRepository.findEventIdByDiscountId(discountId.toString())
+                .flatMap(eventDoc -> {
+                    if (eventDoc == null) {
+                        log.debug("Parent event not found for discount {}. Skipping projection.", discountId);
+                        future.complete(null);
+                        return Mono.empty();
+                    }
+
+                    log.info("Projecting full discount {} due to relationship change.", discountId);
+                    // Trigger the full re-projection of this single discount
+                    return projectorService.projectDiscountChange(UUID.fromString(eventDoc.getId()), discountId)
+                            .doOnSuccess(v -> future.complete(null))
+                            .doOnError(e -> handleProjectionError(e, future));
+                })
+                .switchIfEmpty(Mono.fromRunnable(() -> future.complete(null))) // Ensure future completes if no event is found
                 .subscribe();
     }
 

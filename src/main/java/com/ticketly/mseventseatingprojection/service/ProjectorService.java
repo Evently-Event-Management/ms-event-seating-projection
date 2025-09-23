@@ -1,13 +1,12 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketly.mseventseatingprojection.dto.DiscountMetadataChangePayload;
 import com.ticketly.mseventseatingprojection.dto.OrganizationChangePayload;
 import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.OrganizationDocument;
-import com.ticketly.mseventseatingprojection.repository.CategoryRepository;
-import com.ticketly.mseventseatingprojection.repository.EventRepository;
-import com.ticketly.mseventseatingprojection.repository.OrganizationRepository;
+import com.ticketly.mseventseatingprojection.repository.*;
 import com.ticketly.mseventseatingprojection.service.mapper.EventProjectionMapper;
 import com.ticketly.mseventseatingprojection.service.mapper.SeatingMapMapper;
 import dto.SessionSeatingMapDTO;
@@ -28,6 +27,7 @@ public class ProjectorService {
 
     private final EventProjectionClient eventProjectionClient;
     private final EventRepository eventRepository;
+    private final EventRepositoryCustom eventRepositoryCustom;
     private final OrganizationRepository organizationRepository;
     private final CategoryRepository categoryRepository;
     private final ObjectMapper objectMapper;
@@ -222,5 +222,66 @@ public class ProjectorService {
         log.info("Projecting cover photo removal for event ID: {}", eventId);
         String publicUrl = s3UrlGenerator.generatePublicUrl(photoKey);
         return eventRepository.removeCoverPhotoFromEvent(eventId.toString(), publicUrl).then();
+    }
+
+    /**
+     * Projects a discount change by fetching its latest state and upserting it
+     * into the parent event's embedded discount list.
+     *
+     * @param eventId    The parent event's ID.
+     * @param discountId The ID of the discount that changed.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> projectDiscountChange(UUID eventId, UUID discountId) {
+        log.info("Projecting discount change for event ID: {} and discount ID: {}", eventId, discountId);
+        // "Signal and Fetch" pattern: Debezium is the signal, this client call is the fetch.
+        return eventProjectionClient.getDiscountProjectionData(discountId)
+                .map(eventProjectionMapper::fromDiscount) // Map the DTO to the embedded document
+                .flatMap(discountInfo ->
+                        eventRepositoryCustom.upsertDiscountInEvent(eventId.toString(), discountInfo)
+                )
+                .then();
+    }
+
+    /**
+     * Projects the deletion of a discount by removing it from the parent
+     * event's embedded discount list.
+     *
+     * @param eventId    The parent event's ID.
+     * @param discountId The ID of the discount to remove.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> projectDiscountDeletion(UUID eventId, UUID discountId) {
+        log.info("Projecting discount deletion for event ID: {} and discount ID: {}", eventId, discountId);
+        return eventRepository.removeDiscountFromEvent(eventId.toString(), discountId.toString()).then();
+    }
+
+    /**
+     * Applies a partial update (patch) to an existing discount within an event document.
+     *
+     * @param payload The Debezium payload containing the changed discount metadata.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> patchDiscount(DiscountMetadataChangePayload payload) {
+        String eventId = payload.getEventId().toString();
+        String discountId = payload.getId().toString();
+        log.info("Patching discount {} in event {}", discountId, eventId);
+
+        // Convert the payload to a map of fields to be updated
+        Map<String, Object> fieldsToUpdate = objectMapper.convertValue(payload, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+
+        // Remove keys that are not part of the DiscountInfo sub-document or used for identification
+        fieldsToUpdate.remove("id");
+        fieldsToUpdate.remove("eventId");
+
+        // Convert OffsetDateTime to Instant for MongoDB compatibility
+        if (payload.getActiveFrom() != null) {
+            fieldsToUpdate.put("activeFrom", payload.getActiveFrom().toInstant());
+        }
+        if (payload.getExpiresAt() != null) {
+            fieldsToUpdate.put("expiresAt", payload.getExpiresAt().toInstant());
+        }
+
+        return eventRepositoryCustom.patchDiscountInEvent(eventId, discountId, fieldsToUpdate).then();
     }
 }

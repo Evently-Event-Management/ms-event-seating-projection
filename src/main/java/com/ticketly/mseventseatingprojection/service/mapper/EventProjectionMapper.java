@@ -71,7 +71,7 @@ public class EventProjectionMapper {
                 .build();
     }
 
-    private EventDocument.DiscountInfo fromDiscount(DiscountProjectionDTO dto) {
+    public EventDocument.DiscountInfo fromDiscount(DiscountProjectionDTO dto) {
         if (dto == null) return null;
         return EventDocument.DiscountInfo.builder()
                 .id(dto.getId().toString())
@@ -79,6 +79,8 @@ public class EventProjectionMapper {
                 .parameters(fromDiscountParameters(dto.getParameters()))
                 .maxUsage(dto.getMaxUsage())
                 .currentUsage(dto.getCurrentUsage())
+                .isActive(dto.isActive())
+                .isPublic(dto.isPublic())
                 .activeFrom(dto.getActiveFrom() != null ? dto.getActiveFrom().toInstant() : null)
                 .expiresAt(dto.getExpiresAt() != null ? dto.getExpiresAt().toInstant() : null)
                 .applicableTierIds(dto.getApplicableTierIds() != null
