@@ -2,6 +2,7 @@ package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
+import com.ticketly.mseventseatingprojection.dto.read.DiscountThumbnailDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
@@ -70,6 +71,18 @@ public class EventQueryService {
                 .min(Comparator.comparing(EventDocument.SessionInfo::getStartTime))
                 .orElse(event.getSessions().stream().findFirst().orElse(null));
 
+        List<DiscountThumbnailDTO> discounts = Collections.emptyList();
+        if (event.getAvailableDiscounts() != null) {
+            discounts = event.getAvailableDiscounts().stream()
+                    .map(discount -> DiscountThumbnailDTO.builder()
+                            .parameters(mapToDiscountParameters(discount.getParameters()))
+                            .currentUsage(discount.getCurrentUsage())
+                            .maxUsage(discount.getMaxUsage())
+                            .expiresAt(discount.getExpiresAt())
+                            .build())
+                    .toList();
+        }
+
         // Find the lowest priced tier
         BigDecimal startingPrice = event.getTiers().stream()
                 .map(EventDocument.TierInfo::getPrice)
@@ -93,6 +106,7 @@ public class EventQueryService {
                         : null)
                 .organizationName(event.getOrganization().getName())
                 .categoryName(event.getCategory().getName())
+                .discounts(discounts)
                 .earliestSession(sessionInfo)
                 .startingPrice(startingPrice)
                 .build();
