@@ -132,18 +132,20 @@ public class EventQueryController {
     }
 
     /**
-     * Get details for a specific discount code if it's valid for the given session.
      *
+     *
+     * @param eventId The event ID.
      * @param sessionId The session ID to validate against.
      * @param code The discount code to check.
      * @return Mono emitting ResponseEntity with the discount details or not found.
      */
-    @GetMapping("/sessions/{sessionId}/discounts/{code}")
+    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/{code}")
     public Mono<ResponseEntity<DiscountDetailsDTO>> getDiscountDetails(
+            @PathVariable String eventId,
             @PathVariable String sessionId,
             @PathVariable String code
     ) {
-        return eventQueryService.getDiscountByCodeForSession(sessionId, code)
+        return eventQueryService.getDiscountByCodeForEventAndSession(eventId, sessionId, code)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

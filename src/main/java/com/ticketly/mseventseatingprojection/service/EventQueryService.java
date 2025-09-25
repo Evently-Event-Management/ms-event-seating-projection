@@ -269,6 +269,23 @@ public class EventQueryService {
                 });
     }
 
+    /**
+     *
+     * @param eventId The ID of the event.
+     * @param sessionId The ID of the session.
+     * @param code The discount code.
+     * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
+     */
+    public Mono<DiscountDetailsDTO> getDiscountByCodeForEventAndSession(String eventId, String sessionId, String code) {
+        log.debug("getDiscountByCodeForEventAndSession called for eventId={}, sessionId={}, code={}", eventId, sessionId, code);
+        return eventReadRepository.findActiveDiscountByCodeAndEventAndSession(eventId, sessionId, code)
+                .map(this::mapToDiscountDetailsDTO)
+                .doOnSuccess(dto -> {
+                    if (dto != null) log.info("Discount '{}' found for event {} and session {}", code, eventId, sessionId);
+                    else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
+                });
+    }
+
     private DiscountDetailsDTO mapToDiscountDetailsDTO(EventDocument.DiscountInfo discountInfo) {
         if (discountInfo == null) {
             return null;

@@ -131,6 +131,8 @@ public interface EventReadRepositoryCustom {
      */
     Flux<EventDocument.DiscountInfo> findPublicDiscountsByEventAndSession(String eventId, String sessionId);
 
+    Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndEventAndSession(String eventId, String sessionId, String code);
+
     /**
      * Finds an active discount by its code for a specific session.
      *

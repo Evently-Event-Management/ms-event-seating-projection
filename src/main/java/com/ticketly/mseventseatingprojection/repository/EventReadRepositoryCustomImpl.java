@@ -329,6 +329,40 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
     }
 
     @Override
+    public Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndEventAndSession(String eventId, String sessionId, String code) {
+        Instant now = Instant.now();
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                // 1. Find the correct event directly by its ID (much faster)
+                Aggregation.match(Criteria.where("_id").is(eventId)),
+                // 2. Deconstruct the discounts array
+                Aggregation.unwind("$discounts"),
+                // 3. Filter the discounts
+                Aggregation.match(
+                        new Criteria().andOperator(
+                                Criteria.where("discounts.code").is(code.toUpperCase()),
+                                Criteria.where("discounts.isActive").is(true),
+                                Criteria.where("discounts.applicableSessionIds").in(sessionId),
+                                // Date validity checks remain the same
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.activeFrom").isNull(),
+                                        Criteria.where("discounts.activeFrom").lte(now)
+                                ),
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.expiresAt").isNull(),
+                                        Criteria.where("discounts.expiresAt").gte(now)
+                                )
+                        )
+                ),
+                // 4. Promote the discount document to the root
+                Aggregation.replaceRoot("$discounts"),
+                Aggregation.limit(1)
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.DiscountInfo.class).singleOrEmpty();
+    }
+
+    @Override
     public Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndSession(String sessionId, String code) {
         Instant now = Instant.now();
 
