@@ -1,8 +1,10 @@
 package com.ticketly.mseventseatingprojection.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketly.mseventseatingprojection.dto.DiscountMetadataChangePayload;
 import com.ticketly.mseventseatingprojection.dto.OrganizationChangePayload;
+import com.ticketly.mseventseatingprojection.exception.NonRetryableProjectionException;
 import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.OrganizationDocument;
@@ -264,30 +266,36 @@ public class ProjectorService {
      * @return Mono signaling completion.
      */
     public Mono<Void> patchDiscount(DiscountMetadataChangePayload payload) {
-        String eventId = payload.getEventId().toString();
-        String discountId = payload.getId().toString();
-        log.info("Patching discount {} in event {}", discountId, eventId);
+        try {
+            String eventId = payload.getEventId().toString();
+            String discountId = payload.getId().toString();
+            log.info("Patching discount {} in event {}", discountId, eventId);
 
-        // ✅ Manually and explicitly build the map to ensure correct camelCase keys
-        Map<String, Object> fieldsToUpdate = new HashMap<>();
-        fieldsToUpdate.put("code", payload.getCode());
-        fieldsToUpdate.put("parameters", objectMapper.treeToValue(payload.getParameters(), EventDocument.DiscountParametersInfo.class));
-        fieldsToUpdate.put("maxUsage", payload.getMaxUsage());
-        fieldsToUpdate.put("currentUsage", payload.getCurrentUsage());
-        fieldsToUpdate.put("isActive", payload.isActive());
-        fieldsToUpdate.put("isPublic", payload.isPublic());
+            Map<String, Object> fieldsToUpdate = new HashMap<>();
+            fieldsToUpdate.put("code", payload.getCode());
+            fieldsToUpdate.put("maxUsage", payload.getMaxUsage());
+            fieldsToUpdate.put("currentUsage", payload.getCurrentUsage());
+            fieldsToUpdate.put("isActive", payload.isActive());
+            fieldsToUpdate.put("isPublic", payload.isPublic());
 
-        // Convert OffsetDateTime to Instant for MongoDB compatibility
-        // Convert OffsetDateTime to Instant for MongoDB compatibility
-        if (payload.getActiveFrom() != null) {
-            fieldsToUpdate.put("activeFrom", payload.getActiveFrom().toInstant());
+            // ✅ FIX: Perform a two-step parse for the nested JSON string
+            if (payload.getParameters() != null && !payload.getParameters().isNull()) {
+                String paramsJson = payload.getParameters().asText();
+                EventDocument.DiscountParametersInfo paramsInfo = objectMapper.readValue(paramsJson, EventDocument.DiscountParametersInfo.class);
+                fieldsToUpdate.put("parameters", paramsInfo);
+            }
+
+            if (payload.getActiveFrom() != null) {
+                fieldsToUpdate.put("activeFrom", payload.getActiveFrom().toInstant());
+            }
+            if (payload.getExpiresAt() != null) {
+                fieldsToUpdate.put("expiresAt", payload.getExpiresAt().toInstant());
+            }
+
+            return eventRepositoryCustom.patchDiscountInEvent(eventId, discountId, fieldsToUpdate).then();
+
+        } catch (JsonProcessingException e) {
+            throw new NonRetryableProjectionException("Failed to parse discount parameters JSON", e);
         }
-
-        if (payload.getExpiresAt() != null) {
-            fieldsToUpdate.put("expiresAt", payload.getExpiresAt().toInstant());
-        }
-
-        // Use the custom repository which was already correctly implemented
-        return eventRepositoryCustom.patchDiscountInEvent(eventId, discountId, fieldsToUpdate).then();
     }
 }
