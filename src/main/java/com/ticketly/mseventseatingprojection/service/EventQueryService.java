@@ -298,6 +298,8 @@ public class EventQueryService {
                 .isPublic(discountInfo.isPublic())
                 .activeFrom(discountInfo.getActiveFrom())
                 .expiresAt(discountInfo.getExpiresAt())
+                .maxUsage(discountInfo.getMaxUsage())
+                .currentUsage(discountInfo.getCurrentUsage())
                 .build();
     }
 
