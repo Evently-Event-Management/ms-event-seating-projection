@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.controller;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
@@ -109,6 +110,40 @@ public class EventQueryController {
     ) {
         return eventQueryService.findSessionsInRange(eventId, fromDate, toDate)
                 .collectList()
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Get all public, active discounts for a specific event session.
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID.
+     * @return Mono emitting ResponseEntity with a list of public discounts.
+     */
+    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/public")
+    public Mono<ResponseEntity<List<DiscountDetailsDTO>>> getPublicDiscounts(
+            @PathVariable String eventId,
+            @PathVariable String sessionId
+    ) {
+        return eventQueryService.getPublicDiscountsForSession(eventId, sessionId)
+                .collectList()
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * Get details for a specific discount code if it's valid for the given session.
+     *
+     * @param sessionId The session ID to validate against.
+     * @param code The discount code to check.
+     * @return Mono emitting ResponseEntity with the discount details or not found.
+     */
+    @GetMapping("/sessions/{sessionId}/discounts/{code}")
+    public Mono<ResponseEntity<DiscountDetailsDTO>> getDiscountDetails(
+            @PathVariable String sessionId,
+            @PathVariable String code
+    ) {
+        return eventQueryService.getDiscountByCodeForSession(sessionId, code)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

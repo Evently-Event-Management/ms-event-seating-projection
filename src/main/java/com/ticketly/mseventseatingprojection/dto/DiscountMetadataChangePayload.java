@@ -4,7 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
+
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Data
@@ -33,8 +36,18 @@ public class DiscountMetadataChangePayload {
     private boolean isPublic;
 
     @JsonProperty("active_from")
-    private OffsetDateTime activeFrom;
+    private Long activeFromMicros;
 
     @JsonProperty("expires_at")
-    private OffsetDateTime expiresAt;
+    private Long expiresAtMicros;
+
+    public OffsetDateTime getActiveFrom() {
+        return activeFromMicros == null ? null :
+                Instant.ofEpochMilli(activeFromMicros / 1000).atOffset(ZoneOffset.UTC);
+    }
+
+    public OffsetDateTime getExpiresAt() {
+        return expiresAtMicros == null ? null :
+                Instant.ofEpochMilli(expiresAtMicros / 1000).atOffset(ZoneOffset.UTC);
+    }
 }

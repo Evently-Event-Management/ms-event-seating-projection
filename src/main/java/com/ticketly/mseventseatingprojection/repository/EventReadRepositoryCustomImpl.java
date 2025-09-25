@@ -293,4 +293,73 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Execute the query and expect a single result
         return reactiveMongoTemplate.aggregate(aggregation, "events", SessionStatusInfo.class).next();
     }
+
+
+    @Override
+    public Flux<EventDocument.DiscountInfo> findPublicDiscountsByEventAndSession(String eventId, String sessionId) {
+        Instant now = Instant.now();
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                // 1. Find the correct event
+                Aggregation.match(Criteria.where("_id").is(eventId)),
+                // 2. Deconstruct the discounts array
+                Aggregation.unwind("$discounts"),
+                // 3. Filter the discounts
+                Aggregation.match(
+                        new Criteria().andOperator(
+                                Criteria.where("discounts.isPublic").is(true),
+                                Criteria.where("discounts.isActive").is(true),
+                                Criteria.where("discounts.applicableSessionIds").in(sessionId),
+                                // Check if the discount is currently valid
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.activeFrom").isNull(),
+                                        Criteria.where("discounts.activeFrom").lte(now)
+                                ),
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.expiresAt").isNull(),
+                                        Criteria.where("discounts.expiresAt").gte(now)
+                                )
+                        )
+                ),
+                // 4. Promote the discount document to the root
+                Aggregation.replaceRoot("$discounts")
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.DiscountInfo.class);
+    }
+
+    @Override
+    public Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndSession(String sessionId, String code) {
+        Instant now = Instant.now();
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                // 1. Find the event that contains this session
+                Aggregation.match(Criteria.where("sessions.id").is(sessionId)),
+                // 2. Deconstruct the discounts array
+                Aggregation.unwind("$discounts"),
+                // 3. Filter the discounts
+                Aggregation.match(
+                        new Criteria().andOperator(
+                                Criteria.where("discounts.code").is(code.toUpperCase()), // Case-insensitive match
+                                Criteria.where("discounts.isActive").is(true),
+                                Criteria.where("discounts.applicableSessionIds").in(sessionId),
+                                // Check if the discount is currently valid
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.activeFrom").isNull(),
+                                        Criteria.where("discounts.activeFrom").lte(now)
+                                ),
+                                new Criteria().orOperator(
+                                        Criteria.where("discounts.expiresAt").isNull(),
+                                        Criteria.where("discounts.expiresAt").gte(now)
+                                )
+                        )
+                ),
+                // 4. Promote the discount document to the root
+                Aggregation.replaceRoot("$discounts"),
+                // 5. Limit to one result
+                Aggregation.limit(1)
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.DiscountInfo.class).singleOrEmpty();
+    }
 }

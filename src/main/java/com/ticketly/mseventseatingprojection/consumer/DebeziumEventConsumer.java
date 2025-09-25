@@ -363,7 +363,7 @@ public class DebeziumEventConsumer {
         JsonNode message = objectMapper.readTree(payload).path("payload");
         String operation = message.path("op").asText();
 
-        // Deletion still needs to be handled
+        // For Deletion, we get IDs from the 'before' payload
         if ("d".equals(operation)) {
             DiscountMetadataChangePayload discountChange = objectMapper.treeToValue(message.path("before"), DiscountMetadataChangePayload.class);
             projectorService.projectDiscountDeletion(discountChange.getEventId(), discountChange.getId())
@@ -373,18 +373,29 @@ public class DebeziumEventConsumer {
             return;
         }
 
-        // For Create/Update, we patch
+        // For Create and Update, we use the 'after' payload
         DiscountMetadataChangePayload discountChange = objectMapper.treeToValue(message.path("after"), DiscountMetadataChangePayload.class);
 
         eventReadRepository.existsById(discountChange.getEventId().toString())
                 .flatMap(exists -> {
-                    if (exists) {
-                        return projectorService.patchDiscount(discountChange)
-                                .doOnSuccess(v -> future.complete(null))
-                                .doOnError(e -> handleProjectionError(e, future));
+                    if (!exists) {
+                        future.complete(null); // Parent event doesn't exist, skip.
+                        return Mono.empty();
                     }
-                    future.complete(null); // Parent event doesn't exist, skip.
-                    return Mono.empty();
+
+                    // HYBRID LOGIC
+                    Mono<Void> action;
+                    if ("c".equals(operation)) {
+                        log.info("Projecting full discount on create: {}", discountChange.getId());
+                        action = projectorService.projectFullDiscount(discountChange.getEventId(), discountChange.getId());
+                    } else {
+                        log.info("Patching discount on update: {}", discountChange.getId());
+                        action = projectorService.patchDiscount(discountChange);
+                    }
+
+                    return action
+                            .doOnSuccess(v -> future.complete(null))
+                            .doOnError(e -> handleProjectionError(e, future));
                 }).subscribe();
     }
 
@@ -414,11 +425,11 @@ public class DebeziumEventConsumer {
 
                     log.info("Projecting full discount {} due to relationship change.", discountId);
                     // Trigger the full re-projection of this single discount
-                    return projectorService.projectDiscountChange(UUID.fromString(eventDoc.getId()), discountId)
+                    return projectorService.projectFullDiscount(UUID.fromString(eventDoc.getId()), discountId)
                             .doOnSuccess(v -> future.complete(null))
                             .doOnError(e -> handleProjectionError(e, future));
                 })
-                .switchIfEmpty(Mono.fromRunnable(() -> future.complete(null))) // Ensure future completes if no event is found
+                .switchIfEmpty(Mono.fromRunnable(() -> future.complete(null)))
                 .subscribe();
     }
 

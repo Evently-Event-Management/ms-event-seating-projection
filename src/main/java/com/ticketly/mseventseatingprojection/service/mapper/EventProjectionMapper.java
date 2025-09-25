@@ -3,10 +3,10 @@ package com.ticketly.mseventseatingprojection.service.mapper;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.service.S3UrlGenerator;
 import dto.projection.*;
-import dto.projection.discount.BogoDiscountParamsProjectionDTO;
-import dto.projection.discount.DiscountParametersProjectionDTO;
-import dto.projection.discount.FlatOffDiscountParamsProjectionDTO;
-import dto.projection.discount.PercentageDiscountParamsProjectionDTO;
+import dto.projection.discount.BogoDiscountParamsDTO;
+import dto.projection.discount.DiscountParametersDTO;
+import dto.projection.discount.FlatOffDiscountParamsDTO;
+import dto.projection.discount.PercentageDiscountParamsDTO;
 import lombok.AllArgsConstructor;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.stereotype.Component;
@@ -92,20 +92,20 @@ public class EventProjectionMapper {
                 .build();
     }
 
-    private EventDocument.DiscountParametersInfo fromDiscountParameters(DiscountParametersProjectionDTO dto) {
+    private EventDocument.DiscountParametersInfo fromDiscountParameters(DiscountParametersDTO dto) {
         return switch (dto) {
-            case PercentageDiscountParamsProjectionDTO p ->
+            case PercentageDiscountParamsDTO p ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(p.getType())
                             .percentage(p.getPercentage())
                             .build();
-            case FlatOffDiscountParamsProjectionDTO f ->
+            case FlatOffDiscountParamsDTO f ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(f.getType())
                             .amount(f.getAmount())
                             .currency(f.getCurrency())
                             .build();
-            case BogoDiscountParamsProjectionDTO b ->
+            case BogoDiscountParamsDTO b ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(b.getType())
                             .buyQuantity(b.getBuyQuantity())

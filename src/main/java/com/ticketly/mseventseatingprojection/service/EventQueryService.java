@@ -1,12 +1,17 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
+import dto.projection.discount.BogoDiscountParamsDTO;
+import dto.projection.discount.DiscountParametersDTO;
+import dto.projection.discount.FlatOffDiscountParamsDTO;
+import dto.projection.discount.PercentageDiscountParamsDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -232,5 +237,73 @@ public class EventQueryService {
                             .map(this::mapToSessionInfoDTO));
                 })
                 .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
+    }
+
+    /**
+     * Fetches all active, public discounts for a given event and session.
+     *
+     * @param eventId The ID of the event.
+     * @param sessionId The ID of the session.
+     * @return A Flux of DiscountDetailsDTOs.
+     */
+    public Flux<DiscountDetailsDTO> getPublicDiscountsForSession(String eventId, String sessionId) {
+        log.debug("getPublicDiscountsForSession called for eventId={}, sessionId={}", eventId, sessionId);
+        return eventReadRepository.findPublicDiscountsByEventAndSession(eventId, sessionId)
+                .map(this::mapToDiscountDetailsDTO);
+    }
+
+    /**
+     * Fetches a single active discount by its code, verifying it's applicable to the given session.
+     *
+     * @param sessionId The ID of the session.
+     * @param code The discount code.
+     * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
+     */
+    public Mono<DiscountDetailsDTO> getDiscountByCodeForSession(String sessionId, String code) {
+        log.debug("getDiscountByCodeForSession called for sessionId={}, code={}", sessionId, code);
+        return eventReadRepository.findActiveDiscountByCodeAndSession(sessionId, code)
+                .map(this::mapToDiscountDetailsDTO)
+                .doOnSuccess(dto -> {
+                    if (dto != null) log.info("Discount '{}' found for session {}", code, sessionId);
+                    else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
+                });
+    }
+
+    private DiscountDetailsDTO mapToDiscountDetailsDTO(EventDocument.DiscountInfo discountInfo) {
+        if (discountInfo == null) {
+            return null;
+        }
+        return DiscountDetailsDTO.builder()
+                .id(discountInfo.getId())
+                .code(discountInfo.getCode())
+                .parameters(mapToDiscountParameters(discountInfo.getParameters()))
+                .isActive(discountInfo.isActive())
+                .isPublic(discountInfo.isPublic())
+                .activeFrom(discountInfo.getActiveFrom())
+                .expiresAt(discountInfo.getExpiresAt())
+                .build();
+    }
+
+    private DiscountParametersDTO mapToDiscountParameters(EventDocument.DiscountParametersInfo paramsInfo) {
+        if (paramsInfo == null || paramsInfo.getType() == null) {
+            return null;
+        }
+
+        return switch (paramsInfo.getType()) {
+            case PERCENTAGE -> new PercentageDiscountParamsDTO(
+                    paramsInfo.getType(),
+                    paramsInfo.getPercentage()
+            );
+            case FLAT_OFF -> new FlatOffDiscountParamsDTO(
+                    paramsInfo.getType(),
+                    paramsInfo.getAmount(),
+                    paramsInfo.getCurrency()
+            );
+            case BUY_N_GET_N_FREE -> new BogoDiscountParamsDTO(
+                    paramsInfo.getType(),
+                    paramsInfo.getBuyQuantity(),
+                    paramsInfo.getGetQuantity()
+            );
+        };
     }
 }

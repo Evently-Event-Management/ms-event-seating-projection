@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -232,7 +233,7 @@ public class ProjectorService {
      * @param discountId The ID of the discount that changed.
      * @return Mono signaling completion.
      */
-    public Mono<Void> projectDiscountChange(UUID eventId, UUID discountId) {
+    public Mono<Void> projectFullDiscount(UUID eventId, UUID discountId) {
         log.info("Projecting discount change for event ID: {} and discount ID: {}", eventId, discountId);
         // "Signal and Fetch" pattern: Debezium is the signal, this client call is the fetch.
         return eventProjectionClient.getDiscountProjectionData(discountId)
@@ -267,21 +268,26 @@ public class ProjectorService {
         String discountId = payload.getId().toString();
         log.info("Patching discount {} in event {}", discountId, eventId);
 
-        // Convert the payload to a map of fields to be updated
-        Map<String, Object> fieldsToUpdate = objectMapper.convertValue(payload, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        // ✅ Manually and explicitly build the map to ensure correct camelCase keys
+        Map<String, Object> fieldsToUpdate = new HashMap<>();
+        fieldsToUpdate.put("code", payload.getCode());
+        fieldsToUpdate.put("parameters", objectMapper.treeToValue(payload.getParameters(), EventDocument.DiscountParametersInfo.class));
+        fieldsToUpdate.put("maxUsage", payload.getMaxUsage());
+        fieldsToUpdate.put("currentUsage", payload.getCurrentUsage());
+        fieldsToUpdate.put("isActive", payload.isActive());
+        fieldsToUpdate.put("isPublic", payload.isPublic());
 
-        // Remove keys that are not part of the DiscountInfo sub-document or used for identification
-        fieldsToUpdate.remove("id");
-        fieldsToUpdate.remove("eventId");
-
+        // Convert OffsetDateTime to Instant for MongoDB compatibility
         // Convert OffsetDateTime to Instant for MongoDB compatibility
         if (payload.getActiveFrom() != null) {
             fieldsToUpdate.put("activeFrom", payload.getActiveFrom().toInstant());
         }
+
         if (payload.getExpiresAt() != null) {
             fieldsToUpdate.put("expiresAt", payload.getExpiresAt().toInstant());
         }
 
+        // Use the custom repository which was already correctly implemented
         return eventRepositoryCustom.patchDiscountInEvent(eventId, discountId, fieldsToUpdate).then();
     }
 }
