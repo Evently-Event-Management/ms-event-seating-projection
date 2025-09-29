@@ -98,12 +98,15 @@ public class EventProjectionMapper {
                     EventDocument.DiscountParametersInfo.builder()
                             .type(p.getType())
                             .percentage(p.getPercentage())
+                            .minSpend(p.getMinSpend())
+                            .maxDiscount(p.getMaxDiscount())
                             .build();
             case FlatOffDiscountParamsDTO f ->
                     EventDocument.DiscountParametersInfo.builder()
                             .type(f.getType())
                             .amount(f.getAmount())
                             .currency(f.getCurrency())
+                            .minSpend(f.getMinSpend())
                             .build();
             case BogoDiscountParamsDTO b ->
                     EventDocument.DiscountParametersInfo.builder()

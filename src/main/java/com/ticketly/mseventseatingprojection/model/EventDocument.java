@@ -74,6 +74,8 @@ public class EventDocument {
         private String currency;
         private Integer buyQuantity;
         private Integer getQuantity;
+        private BigDecimal minSpend;
+        private BigDecimal maxDiscount;
     }
 
     @Data
