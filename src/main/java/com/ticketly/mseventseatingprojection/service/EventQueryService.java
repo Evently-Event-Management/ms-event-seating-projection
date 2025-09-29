@@ -2,17 +2,13 @@ package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
-import com.ticketly.mseventseatingprojection.dto.read.DiscountThumbnailDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
-import dto.projection.discount.BogoDiscountParamsDTO;
-import dto.projection.discount.DiscountParametersDTO;
-import dto.projection.discount.FlatOffDiscountParamsDTO;
-import dto.projection.discount.PercentageDiscountParamsDTO;
+import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +28,7 @@ import java.util.stream.Collectors;
 public class EventQueryService {
 
     private final EventReadRepositoryCustomImpl eventReadRepository;
+    private final EventQueryMapper eventMapper;
 
     /**
      * Searches for events based on various filters and returns a paginated list of event thumbnails.
@@ -59,66 +56,11 @@ public class EventQueryService {
         return eventReadRepository.searchEvents(
                         searchTerm, categoryId, longitude, latitude, radiusKm,
                         dateFrom, dateTo, priceMin, priceMax, pageable
-                ).map(eventPage -> eventPage.map(this::mapToThumbnailDTO))
+                )
+                // ✅ Delegate mapping to the mapper component
+                .map(eventPage -> eventPage.map(eventMapper::mapToThumbnailDTO))
                 .doOnNext(page -> log.info("searchEvents result: totalElements={}, pageSize={}, pageNumber={}",
                         page.getTotalElements(), page.getSize(), page.getNumber()));
-    }
-
-    private EventThumbnailDTO mapToThumbnailDTO(EventDocument event) {
-        // Find the earliest upcoming session
-        EventDocument.SessionInfo earliestSession = event.getSessions().stream()
-                .filter(s -> s.getStartTime().isAfter(Instant.now()))
-                .min(Comparator.comparing(EventDocument.SessionInfo::getStartTime))
-                .orElse(event.getSessions().stream().findFirst().orElse(null));
-
-        List<DiscountThumbnailDTO> discounts = Collections.emptyList();
-        if (event.getAvailableDiscounts() != null) {
-            discounts = event.getAvailableDiscounts().stream()
-                    .map(discount -> DiscountThumbnailDTO.builder()
-                            .parameters(mapToDiscountParameters(discount.getParameters()))
-                            .currentUsage(discount.getCurrentUsage())
-                            .maxUsage(discount.getMaxUsage())
-                            .expiresAt(discount.getExpiresAt())
-                            .build())
-                    .toList();
-        }
-
-        // Find the lowest priced tier
-        BigDecimal startingPrice = event.getTiers().stream()
-                .map(EventDocument.TierInfo::getPrice)
-                .min(Comparator.naturalOrder())
-                .orElse(BigDecimal.ZERO);
-
-        EventThumbnailDTO.EarliestSessionInfo sessionInfo = null;
-        if (earliestSession != null) {
-            sessionInfo = EventThumbnailDTO.EarliestSessionInfo.builder()
-                    .startTime(earliestSession.getStartTime())
-                    .venueName(earliestSession.getVenueDetails() != null ? earliestSession.getVenueDetails().getName() : "Online")
-                    .city(extractCity(earliestSession.getVenueDetails()))
-                    .build();
-        }
-
-        return EventThumbnailDTO.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .coverPhotoUrl(event.getCoverPhotos() != null && !event.getCoverPhotos().isEmpty()
-                        ? event.getCoverPhotos().getFirst()
-                        : null)
-                .organizationName(event.getOrganization().getName())
-                .categoryName(event.getCategory().getName())
-                .discounts(discounts)
-                .earliestSession(sessionInfo)
-                .startingPrice(startingPrice)
-                .build();
-    }
-
-    private String extractCity(EventDocument.VenueDetailsInfo venue) {
-        if (venue == null || venue.getAddress() == null || venue.getAddress().isBlank()) {
-            return null;
-        }
-        // Simple city extraction logic, can be improved
-        String[] parts = venue.getAddress().split(",");
-        return parts.length > 1 ? parts[1].trim() : parts[0].trim();
     }
 
     /**
@@ -263,7 +205,7 @@ public class EventQueryService {
     public Flux<DiscountDetailsDTO> getPublicDiscountsForSession(String eventId, String sessionId) {
         log.debug("getPublicDiscountsForSession called for eventId={}, sessionId={}", eventId, sessionId);
         return eventReadRepository.findPublicDiscountsByEventAndSession(eventId, sessionId)
-                .map(this::mapToDiscountDetailsDTO);
+                .map(eventMapper::mapToDiscountDetailsDTO);
     }
 
     /**
@@ -276,7 +218,7 @@ public class EventQueryService {
     public Mono<DiscountDetailsDTO> getDiscountByCodeForSession(String sessionId, String code) {
         log.debug("getDiscountByCodeForSession called for sessionId={}, code={}", sessionId, code);
         return eventReadRepository.findActiveDiscountByCodeAndSession(sessionId, code)
-                .map(this::mapToDiscountDetailsDTO)
+                .map(eventMapper::mapToDiscountDetailsDTO)
                 .doOnSuccess(dto -> {
                     if (dto != null) log.info("Discount '{}' found for session {}", code, sessionId);
                     else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
@@ -293,50 +235,10 @@ public class EventQueryService {
     public Mono<DiscountDetailsDTO> getDiscountByCodeForEventAndSession(String eventId, String sessionId, String code) {
         log.debug("getDiscountByCodeForEventAndSession called for eventId={}, sessionId={}, code={}", eventId, sessionId, code);
         return eventReadRepository.findActiveDiscountByCodeAndEventAndSession(eventId, sessionId, code)
-                .map(this::mapToDiscountDetailsDTO)
+                .map(eventMapper::mapToDiscountDetailsDTO)
                 .doOnSuccess(dto -> {
                     if (dto != null) log.info("Discount '{}' found for event {} and session {}", code, eventId, sessionId);
                     else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
                 });
-    }
-
-    private DiscountDetailsDTO mapToDiscountDetailsDTO(EventDocument.DiscountInfo discountInfo) {
-        if (discountInfo == null) {
-            return null;
-        }
-        return DiscountDetailsDTO.builder()
-                .id(discountInfo.getId())
-                .code(discountInfo.getCode())
-                .parameters(mapToDiscountParameters(discountInfo.getParameters()))
-                .isActive(discountInfo.isActive())
-                .isPublic(discountInfo.isPublic())
-                .activeFrom(discountInfo.getActiveFrom())
-                .expiresAt(discountInfo.getExpiresAt())
-                .maxUsage(discountInfo.getMaxUsage())
-                .currentUsage(discountInfo.getCurrentUsage())
-                .build();
-    }
-
-    private DiscountParametersDTO mapToDiscountParameters(EventDocument.DiscountParametersInfo paramsInfo) {
-        if (paramsInfo == null || paramsInfo.getType() == null) {
-            return null;
-        }
-
-        return switch (paramsInfo.getType()) {
-            case PERCENTAGE -> new PercentageDiscountParamsDTO(
-                    paramsInfo.getType(),
-                    paramsInfo.getPercentage()
-            );
-            case FLAT_OFF -> new FlatOffDiscountParamsDTO(
-                    paramsInfo.getType(),
-                    paramsInfo.getAmount(),
-                    paramsInfo.getCurrency()
-            );
-            case BUY_N_GET_N_FREE -> new BogoDiscountParamsDTO(
-                    paramsInfo.getType(),
-                    paramsInfo.getBuyQuantity(),
-                    paramsInfo.getGetQuantity()
-            );
-        };
     }
 }

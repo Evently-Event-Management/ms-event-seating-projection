@@ -75,7 +75,6 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
         // Executes the aggregation pipeline for event search with all filters applied.
         List<AggregationOperation> pipeline = new ArrayList<>();
         List<Criteria> matchCriteriaList = new ArrayList<>();
-        Instant now = Instant.now();
 
         // CRITICAL: $text search MUST be the first stage if used
         boolean hasTextSearch = searchTerm != null && !searchTerm.isBlank();
@@ -127,29 +126,6 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         // Add remaining match criteria as a single $match stage
         pipeline.add(match(new Criteria().andOperator(matchCriteriaList)));
-
-        AggregationOperation filterDiscountsStage = addFields()
-                .addField("availableDiscounts")
-                .withValue(
-                        ArrayOperators.Filter.filter("discounts")
-                                .as("discount")
-                                .by(
-                                        BooleanOperators.And.and(
-                                                ComparisonOperators.Eq.valueOf("$$discount.isPublic").equalToValue(true),
-                                                ComparisonOperators.Eq.valueOf("$$discount.isActive").equalToValue(true),
-                                                BooleanOperators.Or.or(
-                                                        ComparisonOperators.Eq.valueOf("$$discount.activeFrom").equalToValue(null),
-                                                        ComparisonOperators.Lte.valueOf("$$discount.activeFrom").lessThanEqualToValue(now)
-                                                ),
-                                                BooleanOperators.Or.or(
-                                                        ComparisonOperators.Eq.valueOf("$$discount.expiresAt").equalToValue(null),
-                                                        ComparisonOperators.Gte.valueOf("$$discount.expiresAt").greaterThanEqualToValue(now)
-                                                )
-                                        )
-                                )
-                ).build();
-
-        pipeline.add(filterDiscountsStage);
 
 
         List<AggregationOperation> countPipelineOps = new ArrayList<>(pipeline);
