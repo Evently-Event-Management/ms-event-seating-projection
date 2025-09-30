@@ -19,8 +19,6 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,34 +70,7 @@ public class EventQueryService {
     public Mono<EventBasicInfoDTO> getBasicEventInfo(String eventId) {
         log.debug("getBasicEventInfo called for eventId={}", eventId);
         return eventReadRepository.findEventBasicInfoById(eventId)
-                .map(event -> EventBasicInfoDTO.builder()
-                        .id(event.getId())
-                        .title(event.getTitle())
-                        .description(event.getDescription())
-                        .overview(event.getOverview())
-                        .coverPhotos(event.getCoverPhotos())
-                        .organization(event.getOrganization() != null ? EventBasicInfoDTO.OrganizationInfo.builder()
-                                .id(event.getOrganization().getId())
-                                .name(event.getOrganization().getName())
-                                .logoUrl(event.getOrganization().getLogoUrl())
-                                .build() : null)
-                        .category(event.getCategory() != null ? EventBasicInfoDTO.CategoryInfo.builder()
-                                .id(event.getCategory().getId())
-                                .name(event.getCategory().getName())
-                                .parentName(event.getCategory().getParentName())
-                                .build() : null)
-                        .tiers(event.getTiers() != null ? event.getTiers().stream()
-                                .map(tier -> EventBasicInfoDTO.TierInfo.builder()
-                                        .id(tier.getId())
-                                        .name(tier.getName())
-                                        .price(tier.getPrice())
-                                        .color(tier.getColor())
-                                        .build())
-                                .collect(Collectors.toList()) : Collections.emptyList())
-                        .availableDiscounts(event.getDiscounts() != null ? event.getDiscounts().stream().filter(eventMapper::isDiscountCurrentlyValid)
-                                .map(eventMapper::mapToDiscountThumbnailDTO)
-                                .collect(Collectors.toList()) : Collections.emptyList())
-                        .build())
+                .map(eventMapper::mapToBasicInfoDTO)
                 .doOnNext(dto -> log.info("getBasicEventInfo outcome for eventId={}: title={}", eventId, dto.getTitle()))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
     }
@@ -114,36 +85,8 @@ public class EventQueryService {
     public Mono<Page<SessionInfoDTO>> findSessionsBasicInfoByEventId(String eventId, Pageable pageable) {
         log.debug("findSessionsByEventId called for eventId={}, pageable={}", eventId, pageable);
         return eventReadRepository.findSessionsByEventId(eventId, pageable)
-                .map(sessionPage -> sessionPage.map(this::mapToSessionInfoDTO))
+                .map(sessionPage -> sessionPage.map(eventMapper::mapToSessionInfoDTO))
                 .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}", eventId, page.getNumberOfElements()));
-    }
-
-    /**
-     * Maps EventDocument.SessionInfo to SessionInfoDTO.
-     *
-     * @param session The session info from the event document.
-     * @return The mapped SessionInfoDTO.
-     */
-    private SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session) {
-        SessionInfoDTO.VenueDetailsInfo venueDetailsDTO = null;
-        if (session.getVenueDetails() != null) {
-            venueDetailsDTO = SessionInfoDTO.VenueDetailsInfo.builder()
-                    .name(session.getVenueDetails().getName())
-                    .address(session.getVenueDetails().getAddress())
-                    .onlineLink(session.getVenueDetails().getOnlineLink())
-                    .location(session.getVenueDetails().getLocation())
-                    .build();
-        }
-
-        return SessionInfoDTO.builder()
-                .id(session.getId())
-                .startTime(session.getStartTime())
-                .endTime(session.getEndTime())
-                .status(session.getStatus())
-                .sessionType(session.getSessionType())
-                .venueDetails(venueDetailsDTO)
-                .salesStartTime(session.getSalesStartTime())
-                .build();
     }
 
     /**
@@ -176,7 +119,7 @@ public class EventQueryService {
     public Flux<SessionInfoDTO> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
         log.info("findSessionsInRange called: eventId={}, from={}, to={} (fetching sessions)", eventId, fromDate, toDate);
         return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
-                .map(this::mapToSessionInfoDTO);
+                .map(eventMapper::mapToSessionInfoDTO);
     }
 
     /**
@@ -193,7 +136,7 @@ public class EventQueryService {
                     return Mono.justOrEmpty(eventDocument.getSessions().stream()
                             .filter(s -> s.getId().equals(sessionId))
                             .findFirst()
-                            .map(this::mapToSessionInfoDTO));
+                            .map(eventMapper::mapToSessionInfoDTO));
                 })
                 .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
     }

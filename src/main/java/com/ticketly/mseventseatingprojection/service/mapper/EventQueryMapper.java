@@ -3,6 +3,7 @@ package com.ticketly.mseventseatingprojection.service.mapper;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountThumbnailDTO;
+import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import dto.projection.discount.BogoDiscountParamsDTO;
@@ -145,5 +146,43 @@ public class EventQueryMapper extends BaseMapper {
         }
         String[] parts = venue.getAddress().split(",");
         return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+    }
+    
+    /**
+     * Maps an EventDocument to EventBasicInfoDTO
+     * 
+     * @param event The event document
+     * @return The mapped EventBasicInfoDTO
+     */
+    public EventBasicInfoDTO mapToBasicInfoDTO(EventDocument event) {
+        return EventBasicInfoDTO.builder()
+                .id(event.getId())
+                .title(event.getTitle())
+                .description(event.getDescription())
+                .overview(event.getOverview())
+                .coverPhotos(event.getCoverPhotos())
+                .organization(event.getOrganization() != null ? EventBasicInfoDTO.OrganizationInfo.builder()
+                        .id(event.getOrganization().getId())
+                        .name(event.getOrganization().getName())
+                        .logoUrl(event.getOrganization().getLogoUrl())
+                        .build() : null)
+                .category(event.getCategory() != null ? EventBasicInfoDTO.CategoryInfo.builder()
+                        .id(event.getCategory().getId())
+                        .name(event.getCategory().getName())
+                        .parentName(event.getCategory().getParentName())
+                        .build() : null)
+                .tiers(event.getTiers() != null ? event.getTiers().stream()
+                        .map(tier -> EventBasicInfoDTO.TierInfo.builder()
+                                .id(tier.getId())
+                                .name(tier.getName())
+                                .price(tier.getPrice())
+                                .color(tier.getColor())
+                                .build())
+                        .collect(Collectors.toList()) : Collections.emptyList())
+                .availableDiscounts(event.getDiscounts() != null ? event.getDiscounts().stream()
+                        .filter(this::isDiscountCurrentlyValid)
+                        .map(this::mapToDiscountThumbnailDTO)
+                        .collect(Collectors.toList()) : Collections.emptyList())
+                .build();
     }
 }
