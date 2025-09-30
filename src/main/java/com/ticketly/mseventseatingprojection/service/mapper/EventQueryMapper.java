@@ -68,14 +68,14 @@ public class EventQueryMapper extends BaseMapper {
     /**
      * A helper method to determine if a discount is active, public, and valid for a specific session.
      */
-    private boolean isDiscountCurrentlyValid(EventDocument.DiscountInfo discount) {
+    public boolean isDiscountCurrentlyValid(EventDocument.DiscountInfo discount) {
         Instant now = Instant.now();
         return discount != null && discount.isPublic() && discount.isActive() &&
                 (discount.getActiveFrom() == null || !discount.getActiveFrom().isAfter(now)) &&
                 (discount.getExpiresAt() == null || !discount.getExpiresAt().isBefore(now));
     }
 
-    private DiscountThumbnailDTO mapToDiscountThumbnailDTO(EventDocument.DiscountInfo discountInfo) {
+    public DiscountThumbnailDTO mapToDiscountThumbnailDTO(EventDocument.DiscountInfo discountInfo) {
         if (discountInfo == null) {
             return null;
         }
@@ -109,9 +109,9 @@ public class EventQueryMapper extends BaseMapper {
             return null;
         }
         return switch (paramsInfo.getType()) {
-            case PERCENTAGE -> new PercentageDiscountParamsDTO(paramsInfo.getType(), paramsInfo.getPercentage());
+            case PERCENTAGE -> new PercentageDiscountParamsDTO(paramsInfo.getType(), paramsInfo.getPercentage(), paramsInfo.getMinSpend(), paramsInfo.getMaxDiscount());
             case FLAT_OFF ->
-                    new FlatOffDiscountParamsDTO(paramsInfo.getType(), paramsInfo.getAmount(), paramsInfo.getCurrency());
+                    new FlatOffDiscountParamsDTO(paramsInfo.getType(), paramsInfo.getAmount(), paramsInfo.getCurrency(), paramsInfo.getMinSpend());
             case BUY_N_GET_N_FREE ->
                     new BogoDiscountParamsDTO(paramsInfo.getType(), paramsInfo.getBuyQuantity(), paramsInfo.getGetQuantity());
         };

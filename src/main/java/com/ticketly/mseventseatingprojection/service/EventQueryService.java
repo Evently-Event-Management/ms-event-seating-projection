@@ -96,6 +96,9 @@ public class EventQueryService {
                                         .color(tier.getColor())
                                         .build())
                                 .collect(Collectors.toList()) : Collections.emptyList())
+                        .availableDiscounts(event.getDiscounts() != null ? event.getDiscounts().stream().filter(eventMapper::isDiscountCurrentlyValid)
+                                .map(eventMapper::mapToDiscountThumbnailDTO)
+                                .collect(Collectors.toList()) : Collections.emptyList())
                         .build())
                 .doOnNext(dto -> log.info("getBasicEventInfo outcome for eventId={}: title={}", eventId, dto.getTitle()))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
