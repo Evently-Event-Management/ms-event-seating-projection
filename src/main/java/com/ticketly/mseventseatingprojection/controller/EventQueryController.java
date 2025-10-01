@@ -139,7 +139,7 @@ public class EventQueryController {
      * @param code The discount code to check.
      * @return Mono emitting ResponseEntity with the discount details or not found.
      */
-    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/{code}")
+    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/code/{code}")
     public Mono<ResponseEntity<DiscountDetailsDTO>> getDiscountDetails(
             @PathVariable String eventId,
             @PathVariable String sessionId,

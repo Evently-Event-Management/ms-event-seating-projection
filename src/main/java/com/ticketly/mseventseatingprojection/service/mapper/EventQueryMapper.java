@@ -101,6 +101,7 @@ public class EventQueryMapper extends BaseMapper {
                 .activeFrom(discountInfo.getActiveFrom())
                 .expiresAt(discountInfo.getExpiresAt())
                 .maxUsage(discountInfo.getMaxUsage())
+                .applicableTierIds(discountInfo.getApplicableTierIds())
                 .currentUsage(discountInfo.getCurrentUsage())
                 .build();
     }

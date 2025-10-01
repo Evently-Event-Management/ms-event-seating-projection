@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -18,4 +19,5 @@ public class DiscountDetailsDTO {
     private Instant expiresAt;
     private Integer maxUsage;
     private Integer currentUsage;
+    private List<String> applicableTierIds;
 }
