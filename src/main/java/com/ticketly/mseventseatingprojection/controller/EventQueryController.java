@@ -12,6 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/events")
 @RequiredArgsConstructor
+@EnableReactiveMethodSecurity
 public class EventQueryController {
 
     private final EventQueryService eventQueryService;
@@ -140,6 +143,7 @@ public class EventQueryController {
      * @return Mono emitting ResponseEntity with the discount details or not found.
      */
     @GetMapping("/{eventId}/sessions/{sessionId}/discounts/code/{code}")
+    @PreAuthorize("isAuthenticated()")
     public Mono<ResponseEntity<DiscountDetailsDTO>> getDiscountDetails(
             @PathVariable String eventId,
             @PathVariable String sessionId,

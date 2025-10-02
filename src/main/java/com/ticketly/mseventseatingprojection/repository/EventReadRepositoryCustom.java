@@ -131,6 +131,23 @@ public interface EventReadRepositoryCustom {
      */
     Flux<EventDocument.DiscountInfo> findPublicDiscountsByEventAndSession(String eventId, String sessionId);
 
+    /**
+     * Finds all public discounts for a specific event.
+     *
+     * @param eventId The event ID.
+     * @return Flux emitting DiscountInfo for each public discount.
+     */
+    Flux<EventDocument.DiscountInfo> findPublicDiscountsByEvent(String eventId);
+
+
+    /**
+     * Finds an active discount by its code for a specific event and session.
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID.
+     * @param code The discount code.
+     * @return Mono emitting the DiscountInfo if found and active, otherwise empty.
+     */
     Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndEventAndSession(String eventId, String sessionId, String code);
 
     /**

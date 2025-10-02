@@ -84,9 +84,18 @@ public class EventQueryService {
      */
     public Mono<Page<SessionInfoDTO>> findSessionsBasicInfoByEventId(String eventId, Pageable pageable) {
         log.debug("findSessionsByEventId called for eventId={}, pageable={}", eventId, pageable);
-        return eventReadRepository.findSessionsByEventId(eventId, pageable)
-                .map(sessionPage -> sessionPage.map(eventMapper::mapToSessionInfoDTO))
-                .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}", eventId, page.getNumberOfElements()));
+
+        // First fetch event discounts that will be needed for all sessions
+        return eventReadRepository.findPublicDiscountsByEvent(eventId)
+            .collectList()
+            .flatMap(discounts -> {
+                // Then fetch the sessions and map them with the discounts
+                return eventReadRepository.findSessionsByEventId(eventId, pageable)
+                    .map(sessionPage -> sessionPage.map(session ->
+                        eventMapper.mapToSessionInfoDTO(session, discounts)))
+                    .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}",
+                        eventId, page.getNumberOfElements()));
+            });
     }
 
     /**
@@ -118,8 +127,15 @@ public class EventQueryService {
      */
     public Flux<SessionInfoDTO> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
         log.info("findSessionsInRange called: eventId={}, from={}, to={} (fetching sessions)", eventId, fromDate, toDate);
-        return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
-                .map(eventMapper::mapToSessionInfoDTO);
+
+        // First fetch event discounts that will be needed for all sessions
+        return eventReadRepository.findPublicDiscountsByEvent(eventId)
+            .collectList()
+            .flatMapMany(discounts -> {
+                // Then fetch the sessions and map them with the discounts
+                return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
+                    .map(session -> eventMapper.mapToSessionInfoDTO(session, discounts));
+            });
     }
 
     /**
@@ -131,14 +147,23 @@ public class EventQueryService {
     public Mono<SessionInfoDTO> getSessionById(String sessionId) {
         log.debug("getSessionById called for sessionId={}", sessionId);
         return eventReadRepository.findSessionBasicInfoById(sessionId)
-                .flatMap(eventDocument -> {
-                    // Find the specific session within the event document
-                    return Mono.justOrEmpty(eventDocument.getSessions().stream()
-                            .filter(s -> s.getId().equals(sessionId))
-                            .findFirst()
-                            .map(eventMapper::mapToSessionInfoDTO));
-                })
-                .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
+            .flatMap(eventDocument -> {
+                // Find the specific session within the event document
+                EventDocument.SessionInfo session = eventDocument.getSessions().stream()
+                    .filter(s -> s.getId().equals(sessionId))
+                    .findFirst()
+                    .orElse(null);
+
+                if (session == null) {
+                    return Mono.empty();
+                }
+
+                // Fetch public discounts for the event
+                return eventReadRepository.findPublicDiscountsByEvent(eventDocument.getId())
+                    .collectList()
+                    .map(discounts -> eventMapper.mapToSessionInfoDTO(session, discounts));
+            })
+            .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
     }
 
     /**

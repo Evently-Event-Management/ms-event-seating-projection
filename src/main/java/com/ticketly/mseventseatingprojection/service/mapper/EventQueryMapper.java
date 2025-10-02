@@ -76,6 +76,19 @@ public class EventQueryMapper extends BaseMapper {
                 (discount.getExpiresAt() == null || !discount.getExpiresAt().isBefore(now));
     }
 
+    public boolean isDiscountCurrentlyValidForSession(EventDocument.DiscountInfo discount, String sessionId) {
+        if (!isDiscountCurrentlyValid(discount)) {
+            return false;
+        }
+        // If no specific sessions are set, the discount applies to all sessions
+        if (discount.getApplicableSessionIds() == null || discount.getApplicableSessionIds().isEmpty()) {
+            return true;
+        }
+        // Check if the discount is applicable to the given session
+        return discount.getApplicableSessionIds().stream()
+                .anyMatch(id -> id.equals(sessionId));
+    }
+
     public DiscountThumbnailDTO mapToDiscountThumbnailDTO(EventDocument.DiscountInfo discountInfo) {
         if (discountInfo == null) {
             return null;
@@ -128,7 +141,7 @@ public class EventQueryMapper extends BaseMapper {
         };
     }
 
-    public SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session) {
+    public SessionInfoDTO mapToSessionInfoDTO(EventDocument.SessionInfo session, List<EventDocument.DiscountInfo> discounts) {
         SessionInfoDTO.VenueDetailsInfo venueDetailsDTO = null;
         if (session.getVenueDetails() != null) {
             venueDetailsDTO = SessionInfoDTO.VenueDetailsInfo.builder()
@@ -146,6 +159,10 @@ public class EventQueryMapper extends BaseMapper {
                 .status(session.getStatus())
                 .sessionType(session.getSessionType())
                 .venueDetails(venueDetailsDTO)
+                .discounts(discounts != null ? discounts.stream()
+                        .filter(d -> isDiscountCurrentlyValidForSession(d, session.getId()))
+                        .map(this::mapToDiscountThumbnailDTO)
+                        .collect(Collectors.toList()) : Collections.emptyList())
                 .salesStartTime(session.getSalesStartTime())
                 .build();
     }

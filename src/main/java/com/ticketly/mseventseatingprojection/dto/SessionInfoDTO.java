@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.dto;
 
+import com.ticketly.mseventseatingprojection.dto.read.DiscountThumbnailDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,6 +10,7 @@ import model.SessionType;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,6 +24,8 @@ public class SessionInfoDTO {
     private SessionStatus status;
     private SessionType sessionType;
     private VenueDetailsInfo venueDetails;
+    private List<DiscountThumbnailDTO> discounts;
+
 
     @Data
     @Builder
