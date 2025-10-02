@@ -4,6 +4,7 @@ import dto.projection.discount.DiscountParametersDTO;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -19,5 +20,15 @@ public class DiscountDetailsDTO {
     private Instant expiresAt;
     private Integer maxUsage;
     private Integer currentUsage;
-    private List<String> applicableTierIds;
+    private List<TierInfo> applicableTiers;
+
+
+    @Data
+    @Builder
+    public static class TierInfo {
+        private String id;
+        private String name;
+        private BigDecimal price;
+        private String color;
+    }
 }

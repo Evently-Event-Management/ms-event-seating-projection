@@ -61,7 +61,7 @@ public class EventDocument {
         private Instant expiresAt;
         private boolean isActive;
         private boolean isPublic;
-        private List<String> applicableTierIds;
+        private List<TierInfo> applicableTiers;
         private List<String> applicableSessionIds;
     }
 

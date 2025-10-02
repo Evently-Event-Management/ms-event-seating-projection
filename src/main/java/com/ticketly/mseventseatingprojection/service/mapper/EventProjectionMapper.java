@@ -83,8 +83,8 @@ public class EventProjectionMapper {
                 .isPublic(dto.isPublic())
                 .activeFrom(dto.getActiveFrom() != null ? dto.getActiveFrom().toInstant() : null)
                 .expiresAt(dto.getExpiresAt() != null ? dto.getExpiresAt().toInstant() : null)
-                .applicableTierIds(dto.getApplicableTierIds() != null
-                        ? dto.getApplicableTierIds().stream().map(Object::toString).collect(Collectors.toList())
+                .applicableTiers(dto.getApplicableTiers() != null
+                        ? dto.getApplicableTiers().stream().map(this::fromTier).collect(Collectors.toList())
                         : null)
                 .applicableSessionIds(dto.getApplicableSessionIds() != null
                         ? dto.getApplicableSessionIds().stream().map(Object::toString).collect(Collectors.toList())
