@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.service.mapper;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountThumbnailDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -210,6 +212,19 @@ public class EventQueryMapper extends BaseMapper {
                         .filter(this::isDiscountCurrentlyValid)
                         .map(this::mapToDiscountThumbnailDTO)
                         .collect(Collectors.toList()) : Collections.emptyList())
+                .build();
+    }
+
+    public SeatDetailsResponse mapToSeatDetailsResponse(EventDocument.SeatInfo seatInfo) {
+        return SeatDetailsResponse.builder()
+                .seatId(UUID.fromString(seatInfo.getId()))
+                .label(seatInfo.getLabel())
+                .tier(SeatDetailsResponse.TierInfo.builder()
+                        .id(UUID.fromString(seatInfo.getTier().getId()))
+                        .name(seatInfo.getTier().getName())
+                        .price(seatInfo.getTier().getPrice())
+                        .color(seatInfo.getTier().getColor())
+                        .build())
                 .build();
     }
 }

@@ -1,24 +1,37 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.internal.CreateOrderRequest;
+import com.ticketly.mseventseatingprojection.dto.internal.EventAndSessionStatus;
+import com.ticketly.mseventseatingprojection.dto.internal.PreOrderValidationResponse;
+import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument.SessionSeatingMapInfo;
+import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
 import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCustomImpl;
+import com.ticketly.mseventseatingprojection.repository.EventRepositoryCustom;
+import com.ticketly.mseventseatingprojection.repository.SeatRepository;
 import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.EventStatus;
+import model.SessionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +39,9 @@ import java.time.Instant;
 public class EventQueryService {
 
     private final EventReadRepositoryCustomImpl eventReadRepository;
+    private final EventRepositoryCustom eventRepositoryCustom;
     private final EventQueryMapper eventMapper;
+    private final SeatRepository seatRepository;
 
     /**
      * Searches for events based on various filters and returns a paginated list of event thumbnails.
@@ -87,15 +102,15 @@ public class EventQueryService {
 
         // First fetch event discounts that will be needed for all sessions
         return eventReadRepository.findPublicDiscountsByEvent(eventId)
-            .collectList()
-            .flatMap(discounts -> {
-                // Then fetch the sessions and map them with the discounts
-                return eventReadRepository.findSessionsByEventId(eventId, pageable)
-                    .map(sessionPage -> sessionPage.map(session ->
-                        eventMapper.mapToSessionInfoDTO(session, discounts)))
-                    .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}",
-                        eventId, page.getNumberOfElements()));
-            });
+                .collectList()
+                .flatMap(discounts -> {
+                    // Then fetch the sessions and map them with the discounts
+                    return eventReadRepository.findSessionsByEventId(eventId, pageable)
+                            .map(sessionPage -> sessionPage.map(session ->
+                                    eventMapper.mapToSessionInfoDTO(session, discounts)))
+                            .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}",
+                                    eventId, page.getNumberOfElements()));
+                });
     }
 
     /**
@@ -130,12 +145,12 @@ public class EventQueryService {
 
         // First fetch event discounts that will be needed for all sessions
         return eventReadRepository.findPublicDiscountsByEvent(eventId)
-            .collectList()
-            .flatMapMany(discounts -> {
-                // Then fetch the sessions and map them with the discounts
-                return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
-                    .map(session -> eventMapper.mapToSessionInfoDTO(session, discounts));
-            });
+                .collectList()
+                .flatMapMany(discounts -> {
+                    // Then fetch the sessions and map them with the discounts
+                    return eventReadRepository.findSessionsInRange(eventId, fromDate, toDate)
+                            .map(session -> eventMapper.mapToSessionInfoDTO(session, discounts));
+                });
     }
 
     /**
@@ -147,29 +162,29 @@ public class EventQueryService {
     public Mono<SessionInfoDTO> getSessionById(String sessionId) {
         log.debug("getSessionById called for sessionId={}", sessionId);
         return eventReadRepository.findSessionBasicInfoById(sessionId)
-            .flatMap(eventDocument -> {
-                // Find the specific session within the event document
-                EventDocument.SessionInfo session = eventDocument.getSessions().stream()
-                    .filter(s -> s.getId().equals(sessionId))
-                    .findFirst()
-                    .orElse(null);
+                .flatMap(eventDocument -> {
+                    // Find the specific session within the event document
+                    EventDocument.SessionInfo session = eventDocument.getSessions().stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst()
+                            .orElse(null);
 
-                if (session == null) {
-                    return Mono.empty();
-                }
+                    if (session == null) {
+                        return Mono.empty();
+                    }
 
-                // Fetch public discounts for the event
-                return eventReadRepository.findPublicDiscountsByEvent(eventDocument.getId())
-                    .collectList()
-                    .map(discounts -> eventMapper.mapToSessionInfoDTO(session, discounts));
-            })
-            .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
+                    // Fetch public discounts for the event
+                    return eventReadRepository.findPublicDiscountsByEvent(eventDocument.getId())
+                            .collectList()
+                            .map(discounts -> eventMapper.mapToSessionInfoDTO(session, discounts));
+                })
+                .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
     }
 
     /**
      * Fetches all active, public discounts for a given event and session.
      *
-     * @param eventId The ID of the event.
+     * @param eventId   The ID of the event.
      * @param sessionId The ID of the session.
      * @return A Flux of DiscountDetailsDTOs.
      */
@@ -183,7 +198,7 @@ public class EventQueryService {
      * Fetches a single active discount by its code, verifying it's applicable to the given session.
      *
      * @param sessionId The ID of the session.
-     * @param code The discount code.
+     * @param code      The discount code.
      * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
      */
     public Mono<DiscountDetailsDTO> getDiscountByCodeForSession(String sessionId, String code) {
@@ -198,9 +213,9 @@ public class EventQueryService {
 
     /**
      *
-     * @param eventId The ID of the event.
+     * @param eventId   The ID of the event.
      * @param sessionId The ID of the session.
-     * @param code The discount code.
+     * @param code      The discount code.
      * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
      */
     public Mono<DiscountDetailsDTO> getDiscountByCodeForEventAndSession(String eventId, String sessionId, String code) {
@@ -208,8 +223,72 @@ public class EventQueryService {
         return eventReadRepository.findActiveDiscountByCodeAndEventAndSession(eventId, sessionId, code)
                 .map(eventMapper::mapToDiscountDetailsDTO)
                 .doOnSuccess(dto -> {
-                    if (dto != null) log.info("Discount '{}' found for event {} and session {}", code, eventId, sessionId);
+                    if (dto != null)
+                        log.info("Discount '{}' found for event {} and session {}", code, eventId, sessionId);
                     else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
+                });
+    }
+
+    public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {
+        String eventId = request.getEvent_id().toString();
+        String sessionId = request.getSession_id().toString();
+        List<String> seatIds = request.getSeat_ids();
+
+        // Fetch required data in parallelvalidate-pre-order
+        Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId);
+        Mono<List<EventDocument.SeatInfo>> seatsMono = seatRepository.findSeatDetails(eventId, sessionId, seatIds).collectList();
+
+        // ✅ FIX 1: Wrap the potentially empty discount Mono in an Optional
+        Mono<Optional<EventDocument.DiscountInfo>> optionalDiscountMono = Mono.justOrEmpty(request.getDiscount_id())
+                .flatMap(discountId -> eventRepositoryCustom.findDiscountById(eventId, discountId))
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty());
+
+        return Mono.zip(statusMono, seatsMono, optionalDiscountMono)
+                .flatMap(tuple -> {
+                    EventAndSessionStatus statuses = tuple.getT1();
+                    List<EventDocument.SeatInfo> seats = tuple.getT2();
+                    // ✅ FIX 2: Handle the Optional result from the tuple
+                    Optional<EventDocument.DiscountInfo> optionalDiscount = tuple.getT3();
+
+                    // === Perform Validations ===
+
+                    if (statuses.eventStatus() != EventStatus.APPROVED || statuses.sessionStatus() != SessionStatus.ON_SALE) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event or session is not currently on sale."));
+                    }
+
+                    if (seats.size() != seatIds.size()) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some of the selected seats could not be found."));
+                    }
+                    if (seats.stream().anyMatch(s -> s.getStatus() != ReadModelSeatStatus.AVAILABLE)) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some selected seats are no longer available."));
+                    }
+
+                    if (request.getDiscount_id() != null) {
+                        // Check if the discount was actually found
+                        if (optionalDiscount.isEmpty()) {
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The provided discount is not valid for this event."));
+                        }
+
+                        EventDocument.DiscountInfo discount = optionalDiscount.get();
+                        Instant now = Instant.now();
+                        boolean isDiscountActive = discount.isActive() &&
+                                (discount.getActiveFrom() == null || !discount.getActiveFrom().isAfter(now)) &&
+                                (discount.getExpiresAt() == null || !discount.getExpiresAt().isBefore(now));
+                        if (!isDiscountActive) {
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The provided discount is not currently active."));
+                        }
+                    }
+
+                    // === If all validations pass, build the response ===
+                    List<SeatDetailsResponse> seatDetails = seats.stream()
+                            .map(eventMapper::mapToSeatDetailsResponse)
+                            .toList();
+
+                    return Mono.just(PreOrderValidationResponse.builder()
+                            .seats(seatDetails)
+                            .discount(eventMapper.mapToDiscountDetailsDTO(optionalDiscount.orElse(null)))
+                            .build());
                 });
     }
 }

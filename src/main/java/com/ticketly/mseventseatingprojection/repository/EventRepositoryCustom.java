@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.repository;
 
+import com.ticketly.mseventseatingprojection.dto.internal.EventAndSessionStatus;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
@@ -29,4 +30,22 @@ public interface EventRepositoryCustom {
      * @return A Mono emitting the number of documents modified.
      */
     Mono<Long> patchDiscountInEvent(String eventId, String discountId, Map<String, Object> fieldsToUpdate);
+
+
+    /**
+     * Efficiently finds a single discount within an event by its ID.
+     *
+     * @param eventId    The ID of the parent event document.
+     * @param discountId The ID of the discount to find.
+     * @return A Mono emitting the found DiscountInfo or empty if not found.
+     */
+    Mono<EventDocument.DiscountInfo> findDiscountById(String eventId, String discountId);
+
+    /**
+     * Efficiently fetches only the event status and the status of a single, specific session.
+     * @param eventId The ID of the event.
+     * @param sessionId The ID of the session.
+     * @return A Mono emitting the status information.
+     */
+    Mono<EventAndSessionStatus> findEventAndSessionStatus(String eventId, String sessionId);
 }
