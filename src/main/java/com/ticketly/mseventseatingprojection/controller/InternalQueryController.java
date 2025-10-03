@@ -3,6 +3,7 @@ package com.ticketly.mseventseatingprojection.controller;
 import com.ticketly.mseventseatingprojection.dto.internal.*;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import com.ticketly.mseventseatingprojection.service.SeatService;
+import dto.CreateOrderRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

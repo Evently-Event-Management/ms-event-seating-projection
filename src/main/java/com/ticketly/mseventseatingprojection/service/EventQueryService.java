@@ -1,7 +1,6 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
-import com.ticketly.mseventseatingprojection.dto.internal.CreateOrderRequest;
 import com.ticketly.mseventseatingprojection.dto.internal.EventAndSessionStatus;
 import com.ticketly.mseventseatingprojection.dto.internal.PreOrderValidationResponse;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
@@ -16,6 +15,7 @@ import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCusto
 import com.ticketly.mseventseatingprojection.repository.EventRepositoryCustom;
 import com.ticketly.mseventseatingprojection.repository.SeatRepository;
 import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
+import dto.CreateOrderRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import model.EventStatus;
