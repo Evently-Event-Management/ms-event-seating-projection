@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -16,6 +17,7 @@ public class EventThumbnailDTO {
     private String categoryName;
     private EarliestSessionInfo earliestSession;
     private BigDecimal startingPrice;
+    private List<DiscountThumbnailDTO> discounts;
 
     @Data
     @Builder

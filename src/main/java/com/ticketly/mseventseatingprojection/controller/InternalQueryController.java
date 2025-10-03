@@ -1,9 +1,9 @@
 package com.ticketly.mseventseatingprojection.controller;
 
-import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
-import com.ticketly.mseventseatingprojection.dto.internal.SeatInfoRequest;
-import com.ticketly.mseventseatingprojection.dto.internal.SeatValidationResponse;
+import com.ticketly.mseventseatingprojection.dto.internal.*;
+import com.ticketly.mseventseatingprojection.service.EventQueryService;
 import com.ticketly.mseventseatingprojection.service.SeatService;
+import dto.CreateOrderRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,12 +15,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/internal/v1/sessions") // Dedicated path for internal M2M calls
+@RequestMapping("/internal/v1") // Dedicated path for internal M2M calls
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('SCOPE_internal-api')")
 @Slf4j
 public class InternalQueryController {
 
     private final SeatService seatService;
+    private final EventQueryService eventQueryService;
 
     /**
      * Secure M2M endpoint for the Ticket/Order Service to pre-validate seat availability.
@@ -29,8 +31,7 @@ public class InternalQueryController {
      * @param request   The request containing the seat IDs.
      * @return A 200 OK if all seats are available, or a 409 Conflict if any are not.
      */
-    @PostMapping("/{sessionId}/seats/validate")
-    @PreAuthorize("hasAuthority('SCOPE_internal-api')")
+    @PostMapping("/sessions/{sessionId}/seats/validate")
     public Mono<ResponseEntity<SeatValidationResponse>> validateSeats(
             @PathVariable String sessionId,
             @Valid @RequestBody SeatInfoRequest request) {
@@ -59,8 +60,7 @@ public class InternalQueryController {
      * @param request   The request containing the seat IDs to retrieve details for.
      * @return A list of seat details.
      */
-    @PostMapping("/{sessionId}/seats/details")
-    @PreAuthorize("hasAuthority('SCOPE_internal-api')")
+    @PostMapping("/sessions/{sessionId}/seats/details")
     public Flux<SeatDetailsResponse> getSeatDetails(
             @PathVariable String sessionId,
             @Valid @RequestBody SeatInfoRequest request) {
@@ -69,5 +69,20 @@ public class InternalQueryController {
         log.debug("getSeatDetails request payload: {}", request);
 
         return seatService.getSeatDetails(sessionId, request);
+    }
+
+    /**
+     * Validates the details of a potential order before creation.
+     * Checks seat availability, event/session status, and discount validity.
+     *
+     * @param request The validation request containing event, session, seat, and discount IDs.
+     * @return A Mono emitting the validated seat and discount details, or a 400 Bad Request if validation fails.
+     */
+    @PostMapping("/validate-pre-order")
+    public Mono<ResponseEntity<PreOrderValidationResponse>> validatePreOrder(
+            @RequestBody @Valid CreateOrderRequest request
+    ) {
+        return eventQueryService.validatePreOrderDetails(request)
+                .map(ResponseEntity::ok);
     }
 }

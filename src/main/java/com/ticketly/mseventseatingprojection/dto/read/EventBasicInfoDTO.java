@@ -17,6 +17,7 @@ public class EventBasicInfoDTO {
     private OrganizationInfo organization;
     private CategoryInfo category;
     private List<TierInfo> tiers;
+    private List<DiscountThumbnailDTO> availableDiscounts;
 
     @Data
     @Builder

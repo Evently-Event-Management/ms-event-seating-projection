@@ -1,6 +1,7 @@
 package com.ticketly.mseventseatingprojection.controller;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
@@ -11,6 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/events")
 @RequiredArgsConstructor
+@EnableReactiveMethodSecurity
 public class EventQueryController {
 
     private final EventQueryService eventQueryService;
@@ -109,6 +113,43 @@ public class EventQueryController {
     ) {
         return eventQueryService.findSessionsInRange(eventId, fromDate, toDate)
                 .collectList()
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Get all public, active discounts for a specific event session.
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID.
+     * @return Mono emitting ResponseEntity with a list of public discounts.
+     */
+    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/public")
+    public Mono<ResponseEntity<List<DiscountDetailsDTO>>> getPublicDiscounts(
+            @PathVariable String eventId,
+            @PathVariable String sessionId
+    ) {
+        return eventQueryService.getPublicDiscountsForSession(eventId, sessionId)
+                .collectList()
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     *
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID to validate against.
+     * @param code The discount code to check.
+     * @return Mono emitting ResponseEntity with the discount details or not found.
+     */
+    @GetMapping("/{eventId}/sessions/{sessionId}/discounts/code/{code}")
+    @PreAuthorize("isAuthenticated()")
+    public Mono<ResponseEntity<DiscountDetailsDTO>> getDiscountDetails(
+            @PathVariable String eventId,
+            @PathVariable String sessionId,
+            @PathVariable String code
+    ) {
+        return eventQueryService.getDiscountByCodeForEventAndSession(eventId, sessionId, code)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

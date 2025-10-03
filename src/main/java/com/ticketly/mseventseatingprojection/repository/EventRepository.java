@@ -127,4 +127,26 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
      */
     @Query(value = "{ 'id': ?0 }", fields = "{ 'title': 1 }")
     Mono<EventDocument> findEventTitleById(String eventId);
+
+    /**
+     * Atomically removes a specific discount sub-document from the discounts array
+     * based on its ID.
+     *
+     * @param eventId    The ID of the parent event document.
+     * @param discountId The ID of the discount to remove from the array.
+     * @return A Mono emitting the number of documents modified.
+     */
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$pull': { 'discounts': { 'id': ?1 } } }")
+    Mono<Long> removeDiscountFromEvent(String eventId, String discountId);
+
+    /**
+     * Finds an event's ID containing a specific discount by discount ID.
+     * Uses a projection to return ONLY the event's top-level ID for maximum efficiency.
+     *
+     * @param discountId The ID of the discount to search for.
+     * @return Mono emitting the EventDocument containing only its ID.
+     */
+    @Query(value = "{ 'discounts.id': ?0 }", fields = "{ '_id': 1 }")
+    Mono<EventDocument> findEventIdByDiscountId(String discountId);
 }

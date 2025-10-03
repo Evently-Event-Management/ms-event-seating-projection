@@ -2,6 +2,7 @@ package com.ticketly.mseventseatingprojection.service;
 
 
 import dto.projection.CategoryProjectionDTO;
+import dto.projection.DiscountProjectionDTO;
 import dto.projection.EventProjectionDTO;
 import dto.projection.SessionProjectionDTO;
 import lombok.Getter;
@@ -81,6 +82,17 @@ public class EventProjectionClient {
                 .retrieve()
                 .bodyToMono(CategoryProjectionDTO.class)
                 .doOnNext(categoryData -> log.info("Retrieved category projection data for category ID: {}", categoryId))
+                .timeout(Duration.ofSeconds(10))
+                .onErrorMap(this::wrapError);
+    }
+
+    public Mono<DiscountProjectionDTO> getDiscountProjectionData(UUID discountId) {
+        String url = String.format("%s/internal/v1/discounts/%s/projection-data", eventServiceBaseUrl, discountId);
+        return internalApiWebClient.get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(DiscountProjectionDTO.class)
+                .doOnNext(discountData -> log.info("Retrieved discount projection data for discount ID: {}", discountId))
                 .timeout(Duration.ofSeconds(10))
                 .onErrorMap(this::wrapError);
     }

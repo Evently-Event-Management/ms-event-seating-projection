@@ -1,11 +1,15 @@
 package com.ticketly.mseventseatingprojection.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import model.EventStatus;
 import model.SessionStatus;
 import model.SessionType;
+import model.DiscountType;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.index.*;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -17,6 +21,8 @@ import java.util.List;
 @Data
 @Builder
 @Document(collection = "events")
+@AllArgsConstructor
+@NoArgsConstructor
 public class EventDocument {
 
     @Id
@@ -36,8 +42,41 @@ public class EventDocument {
     private CategoryInfo category;
     private List<TierInfo> tiers;
     private List<SessionInfo> sessions;
+    private List<DiscountInfo> discounts;
+
+    @Transient
+    private List<DiscountInfo> availableDiscounts;
 
     // --- Embedded Sub-documents ---
+
+    @Data
+    @Builder
+    public static class DiscountInfo {
+        private String id;
+        private String code;
+        private DiscountParametersInfo parameters;
+        private Integer maxUsage;
+        private Integer currentUsage;
+        private Instant activeFrom;
+        private Instant expiresAt;
+        private boolean isActive;
+        private boolean isPublic;
+        private List<TierInfo> applicableTiers;
+        private List<String> applicableSessionIds;
+    }
+
+    @Data
+    @Builder
+    public static class DiscountParametersInfo {
+        private DiscountType type;
+        private BigDecimal percentage;
+        private BigDecimal amount;
+        private String currency;
+        private Integer buyQuantity;
+        private Integer getQuantity;
+        private BigDecimal minSpend;
+        private BigDecimal maxDiscount;
+    }
 
     @Data
     @Builder
