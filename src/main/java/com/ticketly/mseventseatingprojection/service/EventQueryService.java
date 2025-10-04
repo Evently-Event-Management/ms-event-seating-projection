@@ -234,7 +234,7 @@ public class EventQueryService {
         String sessionId = request.getSession_id().toString();
         List<String> seatIds = request.getSeat_ids();
 
-        // Fetch required data in parallelvalidate-pre-order
+
         Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId);
         Mono<List<EventDocument.SeatInfo>> seatsMono = seatRepository.findSeatDetails(eventId, sessionId, seatIds).collectList();
 
@@ -277,6 +277,14 @@ public class EventQueryService {
                                 (discount.getExpiresAt() == null || !discount.getExpiresAt().isBefore(now));
                         if (!isDiscountActive) {
                             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The provided discount is not currently active."));
+                        }
+
+                        //Check if the discount is within usage limits
+                        if (discount.getMaxUsage() != null && discount.getCurrentUsage() != null) {
+                            if (discount.getCurrentUsage() >= discount.getMaxUsage()) {
+                                return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "This discount has reached its maximum usage limit."));
+                            }
                         }
                     }
 
