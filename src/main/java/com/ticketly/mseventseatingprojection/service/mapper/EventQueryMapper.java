@@ -116,6 +116,11 @@ public class EventQueryMapper extends BaseMapper {
                 .activeFrom(discountInfo.getActiveFrom())
                 .expiresAt(discountInfo.getExpiresAt())
                 .maxUsage(discountInfo.getMaxUsage())
+                .applicableSessionIds(discountInfo.getApplicableSessionIds() != null
+                        ? discountInfo.getApplicableSessionIds().stream()
+                        .map(UUID::fromString)
+                        .collect(Collectors.toList())
+                        : null)
                 .applicableTiers(discountInfo.getApplicableTiers() != null
                         ? discountInfo.getApplicableTiers().stream()
                         .map(tier -> DiscountDetailsDTO.TierInfo.builder()

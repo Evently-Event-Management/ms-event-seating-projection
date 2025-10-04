@@ -7,6 +7,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -21,6 +22,7 @@ public class DiscountDetailsDTO {
     private Integer maxUsage;
     private Integer currentUsage;
     private List<TierInfo> applicableTiers;
+    private List<UUID> applicableSessionIds;
 
 
     @Data
