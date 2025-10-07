@@ -117,33 +117,43 @@ public class SeatRepositorImpl implements SeatRepository {
 
     @Override
     public Mono<Boolean> areAnySeatsBooked(String sessionId, List<String> seatIds) {
-        // This query is optimized to stop searching as soon as it finds one match.
-        Query query = Query.query(
-                Criteria.where("sessions")
-                        .elemMatch(
-                                Criteria.where("id").is(sessionId)
-                                        .and("layoutData.layout.blocks.rows.seats.id").in(seatIds)
-                                        .and("layoutData.layout.blocks.rows.seats.status").is(ReadModelSeatStatus.BOOKED.toString())
-                        )
+        Aggregation aggregation = newAggregation(
+                // 1. Find the event and the specific session
+                match(Criteria.where("sessions._id").is(sessionId)),
+                unwind("sessions"),
+                match(Criteria.where("sessions._id").is(sessionId)),
+
+                // 2. Use our robust seat unification logic
+                UNIFY_SEATS_OPERATION,
+                unwind("allSeats"),
+                replaceRoot("allSeats"),
+
+                // 3. Find if any seat in the list is already BOOKED
+                match(
+                        Criteria.where("_id").in(seatIds)
+                                .and("status").is(ReadModelSeatStatus.BOOKED.toString())
+                ),
+
+                // 4. If we find even one, we can stop
+                limit(1)
         );
-        return reactiveMongoTemplate.exists(query, EventDocument.class);
+
+        // .exists() will check if the aggregation pipeline returns at least one document
+        return reactiveMongoTemplate.aggregate(aggregation, "events", Document.class)
+                .hasElements();
     }
 
+    @Override
     public Mono<Long> updateSeatStatuses(String sessionId, List<String> seatIds, ReadModelSeatStatus newStatus) {
-        // 1. Query: Find the event document containing the session.
+        // The initial query can still use 'sessions.id' as Spring handles this top-level mapping well.
         Query query = Query.query(Criteria.where("sessions.id").is(sessionId));
 
-        // 2. Update: Define the update operation with arrayFilters.
         Update update = new Update()
                 .set("sessions.$[sess].layoutData.layout.blocks.$[].rows.$[].seats.$[seat].status", newStatus.toString())
                 .set("sessions.$[sess].layoutData.layout.blocks.$[].seats.$[seat].status", newStatus.toString())
-                // Define the 'sess' identifier for the session filter
-                .filterArray("sess.id", sessionId)
-                // Define the 'seat' identifier for the seat ID filter
-                .filterArray(Criteria.where("seat.id").in(seatIds));
+                .filterArray("sess._id", sessionId)
+                .filterArray(Criteria.where("seat._id").in(seatIds));
 
-        // 3. Execute: Run the update and return the result.
-        // Use updateMulti for safety, though we expect one document.
         return reactiveMongoTemplate.updateMulti(query, update, EventDocument.class)
                 .map(UpdateResult::getModifiedCount);
     }
