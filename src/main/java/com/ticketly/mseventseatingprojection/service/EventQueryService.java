@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -232,7 +233,7 @@ public class EventQueryService {
     public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {
         String eventId = request.getEvent_id().toString();
         String sessionId = request.getSession_id().toString();
-        List<String> seatIds = request.getSeat_ids();
+        List<String> seatIds = request.getSeat_ids().stream().map(UUID::toString).toList();
 
 
         Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId);
@@ -240,7 +241,7 @@ public class EventQueryService {
 
         // ✅ FIX 1: Wrap the potentially empty discount Mono in an Optional
         Mono<Optional<EventDocument.DiscountInfo>> optionalDiscountMono = Mono.justOrEmpty(request.getDiscount_id())
-                .flatMap(discountId -> eventRepositoryCustom.findDiscountById(eventId, discountId))
+                .flatMap(discountId -> eventRepositoryCustom.findDiscountById(eventId, String.valueOf(discountId)))
                 .map(Optional::of)
                 .defaultIfEmpty(Optional.empty());
 

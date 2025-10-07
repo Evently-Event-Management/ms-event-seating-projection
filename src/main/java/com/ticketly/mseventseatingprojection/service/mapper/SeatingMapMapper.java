@@ -52,7 +52,7 @@ public class SeatingMapMapper extends BaseMapper {
     private EventDocument.BlockInfo fromBlock(SeatingMapProjectionDTO.BlockInfo dto) {
         if (dto == null) return null;
         return EventDocument.BlockInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .name(dto.getName())
                 .type(dto.getType())
                 .position(fromPosition(dto.getPosition()))
@@ -67,7 +67,7 @@ public class SeatingMapMapper extends BaseMapper {
     private EventDocument.BlockInfo fromBlock(SessionSeatingMapDTO.Block dto, Map<String, EventDocument.TierInfo> tierInfoMap) {
         if (dto == null) return null;
         return EventDocument.BlockInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .name(dto.getName())
                 .type(dto.getType())
                 .position(fromPosition(dto.getPosition()))
@@ -82,7 +82,7 @@ public class SeatingMapMapper extends BaseMapper {
     private EventDocument.RowInfo fromRow(SeatingMapProjectionDTO.RowInfo dto) {
         if (dto == null) return null;
         return EventDocument.RowInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .label(dto.getLabel())
                 .seats(mapList(dto.getSeats(), this::fromSeat))
                 .build();
@@ -91,7 +91,7 @@ public class SeatingMapMapper extends BaseMapper {
     private EventDocument.RowInfo fromRow(SessionSeatingMapDTO.Row dto, Map<String, EventDocument.TierInfo> tierInfoMap) {
         if (dto == null) return null;
         return EventDocument.RowInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .label(dto.getLabel())
                 .seats(mapList(dto.getSeats(), s -> fromSeat(s, tierInfoMap)))
                 .build();
@@ -100,7 +100,7 @@ public class SeatingMapMapper extends BaseMapper {
     private EventDocument.SeatInfo fromSeat(SeatingMapProjectionDTO.SeatInfo dto) {
         if (dto == null) return null;
         return EventDocument.SeatInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .label(dto.getLabel())
                 .status(toSeatStatus(dto.getStatus() != null ? dto.getStatus().toString() : null))
                 .tier(fromTier(dto.getTier()))
@@ -109,9 +109,9 @@ public class SeatingMapMapper extends BaseMapper {
 
     private EventDocument.SeatInfo fromSeat(SessionSeatingMapDTO.Seat dto, Map<String, EventDocument.TierInfo> tierInfoMap) {
         if (dto == null) return null;
-        EventDocument.TierInfo embeddedTier = dto.getTierId() != null ? tierInfoMap.get(dto.getTierId()) : null;
+        EventDocument.TierInfo embeddedTier = dto.getTierId() != null ? tierInfoMap.get(dto.getTierId().toString()) : null;
         return EventDocument.SeatInfo.builder()
-                .id(dto.getId())
+                .id(String.valueOf(dto.getId()))
                 .label(dto.getLabel())
                 .status(toSeatStatus(dto.getStatus().toString()))
                 .tier(embeddedTier)
