@@ -114,9 +114,24 @@ public class DebeziumEventConsumer {
             String operation = message.path("op").asText();
             log.debug("processSessionChange - operation: {}", operation);
 
+            // For delete operation
             if ("d".equals(operation)) {
-                log.debug("Session delete detected. Nothing to project.");
-                return Mono.empty(); // Nothing to do for deletes
+                SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("before"), SessionChangePayload.class);
+                log.debug("Session delete detected for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+
+                return eventReadRepository.existsById(sessionChange.getEventId().toString())
+                    .flatMap(exists -> {
+                        if (exists) {
+                            log.info("Deleting session for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+                            return projectorService.deleteSession(sessionChange.getEventId(), sessionChange.getId())
+                                .doOnSuccess(v -> log.debug("deleteSession completed for eventId={} sessionId={}",
+                                        sessionChange.getEventId(), sessionChange.getId()))
+                                .onErrorResume(this::handleProjectionError);
+                        } else {
+                            log.debug("Event not present in read model for eventId={}. Skipping session deletion.", sessionChange.getEventId());
+                            return Mono.empty();
+                        }
+                    });
             }
 
             SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
@@ -125,11 +140,19 @@ public class DebeziumEventConsumer {
             return eventReadRepository.existsById(sessionChange.getEventId().toString())
                     .flatMap(exists -> {
                         if (exists) {
-                            log.info("Projecting session update for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
-                            return projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId())
+                            if ("c".equals(operation)) {
+                                log.info("Creating new session for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+                                return projectorService.createSession(sessionChange.getEventId(), sessionChange.getId())
+                                    .doOnSuccess(v -> log.debug("createSession completed for eventId={} sessionId={}",
+                                            sessionChange.getEventId(), sessionChange.getId()))
+                                    .onErrorResume(this::handleProjectionError);
+                            } else {
+                                log.info("Updating existing session for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+                                return projectorService.projectSessionUpdate(sessionChange.getEventId(), sessionChange.getId())
                                     .doOnSuccess(v -> log.debug("projectSessionUpdate completed for eventId={} sessionId={}",
                                             sessionChange.getEventId(), sessionChange.getId()))
                                     .onErrorResume(this::handleProjectionError);
+                            }
                         } else {
                             log.debug("Event not present in read model for eventId={}. Skipping session projection.", sessionChange.getEventId());
                             return Mono.empty();

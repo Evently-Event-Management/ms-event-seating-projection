@@ -13,6 +13,9 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -22,110 +25,92 @@ public class SeatStatusConsumer {
     private final SeatStatusService seatStatusService;
 
     /**
-     * Handles Kafka events for seats being locked.
-     * Updates seat status in MongoDB and publishes SSE event.
+     * Handles Kafka events for seat status changes.
+     * Processes different seat statuses (LOCKED, AVAILABLE, BOOKED) with appropriate logic.
      *
-     * @param payload The seat status change event payload.
+     * @param payload The seat status change event payload containing session_id, seat_ids and status.
      * @param acknowledgment Kafka acknowledgment.
      */
-    @KafkaListener(topics = "ticketly.seats.locked")
-    public void onSeatsLocked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsLocked event for session: {}", payload.session_id());
+    @KafkaListener(topics = "ticketly.seats.status")
+    public void onSeatStatusChange(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
+        log.info("Received seat status change event to {} for session: {}", payload.status(), payload.session_id());
         try {
             // Create update DTO for SSE
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.LOCKED);
+            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), payload.status());
 
-            // Update MongoDB first, then decide whether to publish SSE event based on success
-            seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.LOCKED)
-                    .doOnSuccess(success -> {
-                        if (success) {
-                            log.info("Successfully updated seat status to LOCKED in MongoDB");
-                        } else {
-                            log.warn("Failed to update seat status to LOCKED in MongoDB due to business rules");
-                        }
-                    })
-                    .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
-                    .onErrorReturn(false)
-                    .flatMap(success -> {
-                        if (success) {
-                            // Only publish SSE event if MongoDB update was successful
-                            sseService.publish(update, payload.session_id());
-                            log.info("Published SSE event for LOCKED seats in session: {}", payload.session_id());
-                        } else {
-                            log.warn("Skipping SSE event publication due to failed MongoDB update for session: {}", payload.session_id());
-                        }
-                        return Mono.just(success);
-                    })
-                    .doFinally(signalType -> acknowledgment.acknowledge())
-                    .subscribe();
+            switch (payload.status()) {
+                case LOCKED -> handleLocked(payload, update, acknowledgment);
+                case AVAILABLE -> handleAvailable(payload, update, acknowledgment);
+                case BOOKED -> handleBooked(payload, update, acknowledgment);
+                default -> {
+                    log.warn("Unhandled seat status type: {}", payload.status());
+                    acknowledgment.acknowledge();
+                }
+            }
         } catch (Exception e) {
-            log.error("Error processing SeatsLocked event for session {}: {}", payload.session_id(), e.getMessage());
+            log.error("Error processing seat status change event for session {}: {}", payload.session_id(), e.getMessage());
             // Do not acknowledge, let Kafka retry
         }
     }
 
     /**
-     * Handles Kafka events for seats being released.
-     * Updates seat status in MongoDB and publishes SSE event.
-     *
-     * @param payload The seat status change event payload.
-     * @param acknowledgment Kafka acknowledgment.
+     * Handles the LOCKED status - updates MongoDB and publishes SSE event if successful.
      */
-    @KafkaListener(topics = "ticketly.seats.released")
-    public void onSeatsReleased(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsReleased event for session: {}", payload.session_id());
-        try {
-            // Create update DTO for SSE
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.AVAILABLE);
-
-            // Update MongoDB first, then decide whether to publish SSE event based on success
-            seatStatusService.updateSeatStatus(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.AVAILABLE)
-                    .doOnSuccess(success -> {
-                        if (success) {
-                            log.info("Successfully updated seat status to AVAILABLE in MongoDB");
-                        } else {
-                            log.warn("Failed to update seat status to AVAILABLE in MongoDB due to business rules");
-                        }
-                    })
-                    .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
-                    .onErrorReturn(false)
-                    .flatMap(success -> {
-                        if (success) {
-                            // Only publish SSE event if MongoDB update was successful
-                            sseService.publish(update, payload.session_id());
-                            log.info("Published SSE event for AVAILABLE seats in session: {}", payload.session_id());
-                        } else {
-                            log.warn("Skipping SSE event publication due to failed MongoDB update for session: {}", payload.session_id());
-                        }
-                        return Mono.just(success);
-                    })
-                    .doFinally(signalType -> acknowledgment.acknowledge())
-                    .subscribe();
-        } catch (Exception e) {
-            log.error("Error processing SeatsReleased event for session {}: {}", payload.session_id(), e.getMessage());
-            // Do not acknowledge, let Kafka retry
-        }
+    private void handleLocked(SeatStatusChangeEventDto payload, SeatStatusUpdateDto update, Acknowledgment acknowledgment) {
+        log.info("Processing LOCKED status for session: {}", payload.session_id());
+        updateStatusAndPublish(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.LOCKED, update, acknowledgment);
     }
 
     /**
-     * Handles Kafka events for seats being booked.
-     * Publishes SSE event for booked seats (no MongoDB update).
-     *
-     * @param payload The seat status change event payload.
-     * @param acknowledgment Kafka acknowledgment.
+     * Handles the AVAILABLE status - updates MongoDB and publishes SSE event if successful.
      */
-    @KafkaListener(topics = "ticketly.seats.booked")
-    public void onSeatsBooked(@Payload SeatStatusChangeEventDto payload, Acknowledgment acknowledgment) {
-        log.info("Received SeatsBooked event for session: {}", payload.session_id());
+    private void handleAvailable(SeatStatusChangeEventDto payload, SeatStatusUpdateDto update, Acknowledgment acknowledgment) {
+        log.info("Processing AVAILABLE status for session: {}", payload.session_id());
+        updateStatusAndPublish(payload.session_id(), payload.seat_ids(), ReadModelSeatStatus.AVAILABLE, update, acknowledgment);
+    }
+
+    /**
+     * Handles the BOOKED status - only publishes SSE event (no MongoDB update).
+     */
+    private void handleBooked(SeatStatusChangeEventDto payload, SeatStatusUpdateDto update, Acknowledgment acknowledgment) {
+        log.info("Processing BOOKED status for session: {}", payload.session_id());
         try {
             // Only publish SSE event for booked seats, no MongoDB update as per requirement
             // This will be handled by CQRS projection
-            SeatStatusUpdateDto update = new SeatStatusUpdateDto(payload.seat_ids(), ReadModelSeatStatus.BOOKED);
             sseService.publish(update, payload.session_id());
+            log.info("Published SSE event for BOOKED seats in session: {}", payload.session_id());
             acknowledgment.acknowledge();
         } catch (Exception e) {
-            log.error("Error processing SeatsBooked event for session {}: {}", payload.session_id(), e.getMessage());
+            log.error("Error processing BOOKED status for session {}: {}", payload.session_id(), e.getMessage());
             // Do not acknowledge, let Kafka retry
         }
+    }
+
+    /**
+     * Common method to update MongoDB and conditionally publish SSE event.
+     */
+    private void updateStatusAndPublish(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus status, SeatStatusUpdateDto update, Acknowledgment acknowledgment) {
+        seatStatusService.updateSeatStatus(sessionId, seatIds, status)
+            .doOnSuccess(success -> {
+                if (success) {
+                    log.info("Successfully updated seat status to {} in MongoDB", status);
+                } else {
+                    log.warn("Failed to update seat status to {} in MongoDB due to business rules", status);
+                }
+            })
+            .doOnError(e -> log.error("Failed to update seat status in MongoDB: {}", e.getMessage()))
+            .onErrorReturn(false)
+            .flatMap(success -> {
+                if (success) {
+                    // Only publish SSE event if MongoDB update was successful
+                    sseService.publish(update, sessionId);
+                    log.info("Published SSE event for {} seats in session: {}", status, sessionId);
+                } else {
+                    log.warn("Skipping SSE event publication due to failed MongoDB update for session: {}", sessionId);
+                }
+                return Mono.just(success);
+            })
+            .doFinally(signalType -> acknowledgment.acknowledge())
+            .subscribe();
     }
 }

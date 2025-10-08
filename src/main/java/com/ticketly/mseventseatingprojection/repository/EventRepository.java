@@ -45,6 +45,18 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     Mono<Long> updateSessionInEvent(String eventId, String sessionId, EventDocument.SessionInfo sessionInfo);
 
     /**
+     * Atomically adds a new session to an event's 'sessions' array.
+     * This is the correct, race-condition-safe way to add a sub-document.
+     *
+     * @param eventId     The ID of the event to update.
+     * @param sessionInfo The new SessionInfo object to add.
+     * @return A Mono emitting the number of documents modified.
+     */
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$push': { 'sessions': ?1 } }")
+    Mono<Long> addSessionToEvent(String eventId, EventDocument.SessionInfo sessionInfo);
+
+    /**
      * Performs a targeted update on the seating map of a single session.
      *
      * @param eventId        The ID of the parent event document.
@@ -55,6 +67,19 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
     @Query("{ '_id': ?0, 'sessions.id': ?1 }")
     @Update("{ '$set': { 'sessions.$.layoutData': ?2 } }")
     Mono<Long> updateSeatingMapInSession(String eventId, String sessionId, EventDocument.SessionSeatingMapInfo seatingMapInfo);
+
+
+    /**
+     * Atomically removes a session from an event's 'sessions' array by its ID.
+     * This is the correct, race-condition-safe way to delete a sub-document.
+     *
+     * @param eventId   The ID of the parent event document.
+     * @param sessionId The ID of the session to remove.
+     * @return A Mono emitting the number of documents modified.
+     */
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$pull': { 'sessions': { '_id': ?1 } } }")
+    Mono<Long> deleteSessionFromEvent(String eventId, String sessionId);
 
     /**
      * Updates the organization information in all events that belong to a specific organization.

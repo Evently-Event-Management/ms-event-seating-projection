@@ -22,9 +22,11 @@ import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.ExponentialBackOff;
+import org.apache.kafka.common.errors.SerializationException;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.lang.IllegalArgumentException;
 
 @Configuration
 @EnableKafka
@@ -64,7 +66,13 @@ public class KafkaConsumerConfig {
                 NonRetryableProjectionException.class, // Our custom exception for parsing errors in business logic
                 JsonProcessingException.class,         // All Jackson JSON parsing errors
                 DeserializationException.class,        // General Kafka deserialization errors
-                IllegalArgumentException.class         // Errors from invalid data that won't be fixed by a retry
+                SerializationException.class,          // Kafka serialization errors
+                IllegalArgumentException.class,        // Errors from invalid data that won't be fixed by a retry
+                java.util.InputMismatchException.class, // Invalid format issues
+                java.lang.NumberFormatException.class,  // Invalid number format issues
+                java.time.format.DateTimeParseException.class, // Date parsing issues
+                java.util.FormatFlagsConversionMismatchException.class, // Format issues
+                java.time.DateTimeException.class      // Generic date time issues
         );
 
         return errorHandler;

@@ -80,6 +80,37 @@ public class ProjectorService {
     }
 
     /**
+     * Creates a new session within an event by atomically pushing it to the
+     * event's sessions list.
+     *
+     * @param eventId   The UUID of the event.
+     * @param sessionId The UUID of the new session to create.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> createSession(UUID eventId, UUID sessionId) {
+        log.info("Creating session {} for event {}", sessionId, eventId);
+        return eventProjectionClient.getSessionProjectionData(sessionId)
+                .map(eventProjectionMapper::fromSession)
+                // ++ The 'flatMap' now calls the new, atomic repository method ++
+                .flatMap(sessionInfo -> eventRepository.addSessionToEvent(eventId.toString(), sessionInfo))
+                .then();
+    }
+
+
+    /**
+     * Deletes a session from an event document.
+     *
+     * @param eventId   The UUID of the event.
+     * @param sessionId The UUID of the session to delete.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> deleteSession(UUID eventId, UUID sessionId) {
+        log.info("Deleting session {} from event {}", sessionId, eventId);
+        return eventRepository.deleteSessionFromEvent(eventId.toString(), sessionId.toString())
+                .then();
+    }
+
+    /**
      * Projects a patch to the seating map for a session.
      *
      * @param eventId    The UUID of the event.
