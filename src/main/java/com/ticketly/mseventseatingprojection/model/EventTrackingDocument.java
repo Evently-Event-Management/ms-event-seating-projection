@@ -9,18 +9,21 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "event_views")
-@CompoundIndex(name = "event_date_idx", def = "{'eventId' : 1, 'trackingBucket.date': 1}")
+@CompoundIndex(name = "event_date_idx", def = "{'eventId' : 1, 'trackingBuckets.date': 1}")
 public class EventTrackingDocument {
     @Id
     private String id;
     private String eventId;
-    private TrackingBucket trackingBucket;
+    @Builder.Default
+    private List<TrackingBucket> trackingBuckets = new ArrayList<>();
     
     @Data
     @Builder

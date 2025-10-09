@@ -1,42 +1,55 @@
 package com.ticketly.mseventseatingprojection.service;
 
-import com.ticketly.mseventseatingprojection.dto.analytics.EventViewsStatsDTO;
 import com.ticketly.mseventseatingprojection.model.EventTrackingDocument;
-import com.ticketly.mseventseatingprojection.repository.EventViewsRepository;
+import com.ticketly.mseventseatingprojection.repository.EventTrackingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
-
+import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EventTrackingServiceImpl implements EventTrackingService {
 
-    private final EventViewsRepository eventViewsRepository;
+    private final EventTrackingRepository eventTrackingRepository;
 
     @Override
     public Mono<EventTrackingDocument> incrementViewCount(String eventId, String deviceType) {
         log.debug("Incrementing view count for event: {}, device type: {}", eventId, deviceType);
         LocalDate today = LocalDate.now();
 
-        // Validate device type
         if (!isValidDeviceType(deviceType)) {
-            return Mono.error(new IllegalArgumentException("Invalid device type. Must be 'mobile', 'desktop', 'tablet', or 'other'"));
+            return Mono.error(new IllegalArgumentException("Invalid device type."));
         }
 
-        return eventViewsRepository.findByEventIdAndTrackingBucketDate(eventId, today)
+        // 1. Find the document by eventId only
+        return eventTrackingRepository.findByEventId(eventId)
                 .flatMap(document -> {
-                    incrementDeviceViewCount(document.getTrackingBucket(), deviceType);
-                    return eventViewsRepository.save(document);
+                    // 2. Find today's bucket within the existing document
+                    EventTrackingDocument.TrackingBucket todayBucket = document.getTrackingBuckets().stream()
+                            .filter(bucket -> bucket.getDate().equals(today))
+                            .findFirst()
+                            .orElseGet(() -> {
+                                // 3. If bucket doesn't exist for today, create and add it
+                                EventTrackingDocument.TrackingBucket newBucket = EventTrackingDocument.TrackingBucket.builder()
+                                        .date(today)
+                                        .mobileViews(0L).desktopViews(0L).tabletViews(0L).otherViews(0L)
+                                        .orderCount(0L)
+                                        .build();
+                                document.getTrackingBuckets().add(newBucket);
+                                return newBucket;
+                            });
+
+                    // 4. Increment the count and save the updated document
+                    incrementDeviceViewCount(todayBucket, deviceType);
+                    return eventTrackingRepository.save(document);
                 })
                 .switchIfEmpty(
-                        // Create new document if not exists
+                        // 5. If no document exists for the eventId, create a new one
                         Mono.defer(() -> {
                             EventTrackingDocument.TrackingBucket bucket = EventTrackingDocument.TrackingBucket.builder()
                                     .date(today)
@@ -49,16 +62,17 @@ public class EventTrackingServiceImpl implements EventTrackingService {
 
                             EventTrackingDocument document = EventTrackingDocument.builder()
                                     .eventId(eventId)
-                                    .trackingBucket(bucket)
+                                    .trackingBuckets(new ArrayList<>(List.of(bucket))) // Initialize list with the new bucket
                                     .build();
 
-                            return eventViewsRepository.save(document);
+                            return eventTrackingRepository.save(document);
                         })
                 )
                 .doOnSuccess(document -> log.info("Updated {} view count for event: {}, date: {}",
                         deviceType, eventId, today))
                 .doOnError(error -> log.error("Error updating view count for event: {}", eventId, error));
     }
+
 
     /**
      * Validate if device type is one of the accepted values
@@ -77,7 +91,7 @@ public class EventTrackingServiceImpl implements EventTrackingService {
     /**
      * Increment the appropriate device view count field
      *
-     * @param bucket Tracking bucket
+     * @param bucket     Tracking bucket
      * @param deviceType Device type
      */
     private void incrementDeviceViewCount(EventTrackingDocument.TrackingBucket bucket, String deviceType) {
@@ -100,115 +114,11 @@ public class EventTrackingServiceImpl implements EventTrackingService {
         }
     }
 
-@Override
-public Mono<EventTrackingDocument> incrementOrderCount(String eventId) {
-    log.debug("Incrementing order count for event: {}", eventId);
-    LocalDate today = LocalDate.now();
-
-    return eventViewsRepository.findByEventIdAndTrackingBucketDate(eventId, today)
-            .flatMap(document -> {
-                // Increment existing document
-                document.getTrackingBucket().setOrderCount(document.getTrackingBucket().getOrderCount() + 1);
-                return eventViewsRepository.save(document);
-            })
-            .switchIfEmpty(
-                    // Create new document if not exists
-                    Mono.defer(() -> {
-                        EventTrackingDocument.TrackingBucket bucket = EventTrackingDocument.TrackingBucket.builder()
-                                .date(today)
-                                .mobileViews(0L)
-                                .desktopViews(0L)
-                                .tabletViews(0L)
-                                .otherViews(0L)
-                                .orderCount(1L)
-                                .build();
-
-                        EventTrackingDocument document = EventTrackingDocument.builder()
-                                .eventId(eventId)
-                                .trackingBucket(bucket)
-                                .build();
-
-                        return eventViewsRepository.save(document);
-                    })
-            )
-            .doOnSuccess(document -> log.info("Updated order count for event: {}, date: {}, new count: {}",
-                    eventId, today, document.getTrackingBucket().getOrderCount()))
-            .doOnError(error -> log.error("Error updating order count for event: {}", eventId, error));
-}
-
-@Override
-public Mono<EventViewsStatsDTO> getEventViewsStats(String eventId, LocalDate fromDate, LocalDate toDate) {
-    log.debug("Getting event views stats for event: {}, date range: {} to {}", eventId, fromDate, toDate);
-
-    return eventViewsRepository.findByEventId(eventId)
-            .filter(doc -> {
-                LocalDate docDate = doc.getTrackingBucket().getDate();
-                return !docDate.isBefore(fromDate) && !docDate.isAfter(toDate);
-            })
-            .collectList()
-            .map(documents -> {
-                long totalMobileViews = documents.stream()
-                        .mapToLong(doc -> doc.getTrackingBucket().getMobileViews())
-                        .sum();
-
-                long totalDesktopViews = documents.stream()
-                        .mapToLong(doc -> doc.getTrackingBucket().getDesktopViews())
-                        .sum();
-
-                long totalTabletViews = documents.stream()
-                        .mapToLong(doc -> doc.getTrackingBucket().getTabletViews())
-                        .sum();
-                        
-                long totalOtherViews = documents.stream()
-                        .mapToLong(doc -> doc.getTrackingBucket().getOtherViews())
-                        .sum();
-
-                long totalOrders = documents.stream()
-                        .mapToLong(doc -> doc.getTrackingBucket().getOrderCount())
-                        .sum();
-
-                List<EventViewsStatsDTO.DailyStats> dailyStats = documents.stream()
-                        .map(doc -> EventViewsStatsDTO.DailyStats.builder()
-                                .date(doc.getTrackingBucket().getDate())
-                                .mobileViews(doc.getTrackingBucket().getMobileViews())
-                                .desktopViews(doc.getTrackingBucket().getDesktopViews())
-                                .tabletViews(doc.getTrackingBucket().getTabletViews())
-                                .otherViews(doc.getTrackingBucket().getOtherViews())
-                                .orderCount(doc.getTrackingBucket().getOrderCount())
-                                .build())
-                        .collect(Collectors.toList());
-
-                return EventViewsStatsDTO.builder()
-                        .eventId(eventId)
-                        .totalMobileViews(totalMobileViews)
-                        .totalDesktopViews(totalDesktopViews)
-                        .totalTabletViews(totalTabletViews)
-                        .totalOtherViews(totalOtherViews)
-                        .totalOrders(totalOrders)
-                        .fromDate(fromDate)
-                        .toDate(toDate)
-                        .dailyStats(dailyStats)
-                        .build();
-            })
-            .doOnSuccess(stats -> log.info("Retrieved stats for event: {}, mobile: {}, desktop: {}, tablet: {}, other: {}, orders: {}",
-                    eventId, stats.getTotalMobileViews(), stats.getTotalDesktopViews(),
-                    stats.getTotalTabletViews(), stats.getTotalOtherViews(), stats.getTotalOrders()))
-            .doOnError(error -> log.error("Error retrieving stats for event: {}", eventId, error));
-}
-
-@Override
-public Flux<EventTrackingDocument> getAllEventAnalytics(String eventId) {
-    log.debug("Getting all analytics for event: {}", eventId);
-    return eventViewsRepository.findByEventId(eventId)
-            .doOnComplete(() -> log.info("Retrieved all analytics for event: {}", eventId))
-            .doOnError(error -> log.error("Error retrieving analytics for event: {}", eventId, error));
-}
-
-@Override
-public Mono<Void> deleteEventAnalytics(String eventId) {
-    log.debug("Deleting all analytics for event: {}", eventId);
-    return eventViewsRepository.deleteByEventId(eventId)
-            .doOnSuccess(v -> log.info("Deleted all analytics for event: {}", eventId))
-            .doOnError(error -> log.error("Error deleting analytics for event: {}", eventId, error));
-}
+    @Override
+    public Mono<Void> deleteEventAnalytics(String eventId) {
+        log.debug("Deleting all analytics for event: {}", eventId);
+        return eventTrackingRepository.deleteByEventId(eventId)
+                .doOnSuccess(v -> log.info("Deleted all analytics for event: {}", eventId))
+                .doOnError(error -> log.error("Error deleting analytics for event: {}", eventId, error));
+    }
 }

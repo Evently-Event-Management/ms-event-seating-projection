@@ -1,21 +1,17 @@
 package com.ticketly.mseventseatingprojection.controller;
 
-import com.ticketly.mseventseatingprojection.dto.analytics.EventViewsStatsDTO;
 import com.ticketly.mseventseatingprojection.model.EventTrackingDocument;
 import com.ticketly.mseventseatingprojection.service.EventTrackingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/v1/events")
@@ -31,44 +27,28 @@ public class EventTrackingController {
     public Mono<ResponseEntity<EventTrackingDocument>> incrementViewCount(
             @PathVariable String eventId,
             @RequestParam(required = true) String deviceType) {
+        
         log.debug("REST request to increment view count for event: {}, device type: {}", eventId, deviceType);
+        
         return eventTrackingService.incrementViewCount(eventId, deviceType)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
     
-    @PostMapping("/{eventId}/orders/increment")
-    @Operation(summary = "Increment order count for an event")
-    public Mono<ResponseEntity<EventTrackingDocument>> incrementOrderCount(
-            @PathVariable String eventId) {
-        log.debug("REST request to increment order count for event: {}", eventId);
-        return eventTrackingService.incrementOrderCount(eventId)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-    
-    @GetMapping("/{eventId}/views/stats")
-    @Operation(summary = "Get event views statistics for a date range")
-    public Mono<ResponseEntity<EventViewsStatsDTO>> getEventViewsStats(
+    @PostMapping("/{eventId}/views/track")
+    @Operation(summary = "Track a view for an event by automatically detecting device type from User-Agent")
+    public Mono<ResponseEntity<EventTrackingDocument>> trackEventView(
             @PathVariable String eventId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+            ServerHttpRequest request) {
         
-        LocalDate start = fromDate != null ? fromDate : LocalDate.now().minusMonths(1);
-        LocalDate end = toDate != null ? toDate : LocalDate.now();
+        String detectedDeviceType = com.ticketly.mseventseatingprojection.util.UserAgentUtil.getDeviceType(request);
         
-        log.debug("REST request to get event views stats for event: {}, date range: {} to {}", eventId, start, end);
-        return eventTrackingService.getEventViewsStats(eventId, start, end)
+        log.debug("REST request to track view for event: {}, detected device type: {}", 
+                eventId, detectedDeviceType);
+                
+        return eventTrackingService.incrementViewCount(eventId, detectedDeviceType)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-    
-    @GetMapping("/{eventId}/views/all")
-    @Operation(summary = "Get all analytics data for an event")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Flux<EventTrackingDocument> getAllEventAnalytics(@PathVariable String eventId) {
-        log.debug("REST request to get all analytics for event: {}", eventId);
-        return eventTrackingService.getAllEventAnalytics(eventId);
     }
     
     @DeleteMapping("/{eventId}/views")
