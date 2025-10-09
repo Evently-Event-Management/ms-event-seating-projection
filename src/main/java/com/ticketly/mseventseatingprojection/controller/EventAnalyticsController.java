@@ -35,7 +35,7 @@ public class EventAnalyticsController {
      */
     @GetMapping("/events/{eventId}")
     @Operation(summary = "Get comprehensive analytics for an event",
-            description = "Returns aggregated analytics across all sessions including revenue, tickets sold, and capacity metrics")
+            description = "Returns aggregated analytics across all sessions including revenue, tickets sold, and capacity metrics. For event view statistics, see /v1/events/{eventId}/views/stats")
     public Mono<ResponseEntity<EventAnalyticsDTO>> getEventAnalytics(@PathVariable String eventId, @AuthenticationPrincipal Jwt jwt) {
         log.info("User {} requested analytics for event {}", jwt.getSubject(), eventId);
         return eventAnalyticsService.getEventAnalytics(eventId, jwt.getSubject())
