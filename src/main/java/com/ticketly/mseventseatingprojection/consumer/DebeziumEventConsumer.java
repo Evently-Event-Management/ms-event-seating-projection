@@ -40,7 +40,8 @@ public class DebeziumEventConsumer {
             "dbz.ticketly.public.event_cover_photos",
             "dbz.ticketly.public.discounts",
             "dbz.ticketly.public.discount_tiers",
-            "dbz.ticketly.public.discount_sessions"
+            "dbz.ticketly.public.discount_sessions",
+            "dbz.ticketly.public.tiers"
     }, containerFactory = "debeziumListenerContainerFactory")
     public void onDebeziumEvent(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
         String topic = record.topic();
@@ -62,6 +63,7 @@ public class DebeziumEventConsumer {
             case "event_cover_photos" -> processCoverPhotoChange(payload);
             case "discounts" -> processDiscountMetadataChange(payload);
             case "discount_tiers", "discount_sessions" -> processDiscountRelationshipChange(payload);
+            case "tiers" -> processTierChange(payload);
             default -> {
                 log.warn("Unhandled topic: {}", topic);
                 yield Mono.empty();
@@ -349,6 +351,37 @@ public class DebeziumEventConsumer {
                     .then();
         } catch (JsonProcessingException e) {
             return Mono.error(new NonRetryableProjectionException("Failed to parse discount relationship change payload", e));
+        }
+    }
+
+    private Mono<Void> processTierChange(String payload) {
+        try {
+            JsonNode message = objectMapper.readTree(payload).path("payload");
+            String operation = message.path("op").asText();
+            log.debug("processTierChange - operation: {}", operation);
+
+            if ("d".equals(operation)) {
+                log.info("Tier deletion detected. Ignoring as tiers are only deleted when events are deleted.");
+                return Mono.empty();
+            }
+
+            TierChangePayload tierChange = objectMapper.treeToValue(message.path("after"), TierChangePayload.class);
+            log.info("Tier change detected for eventId={} tierId={}. Projecting full event.", tierChange.getEventId(), tierChange.getId());
+
+            return eventReadRepository.existsById(tierChange.getEventId().toString())
+                    .flatMap(exists -> {
+                        if (exists) {
+                            log.info("Projecting full event for eventId={} due to tier change", tierChange.getEventId());
+                            return projectorService.projectFullEvent(tierChange.getEventId())
+                                    .doOnSuccess(v -> log.debug("projectFullEvent completed for eventId={} after tier change", tierChange.getEventId()))
+                                    .onErrorResume(this::handleProjectionError);
+                        } else {
+                            log.debug("Event not present in read model for eventId={}. Skipping tier projection.", tierChange.getEventId());
+                            return Mono.empty();
+                        }
+                    });
+        } catch (JsonProcessingException e) {
+            return Mono.error(new NonRetryableProjectionException("Failed to parse tier change payload", e));
         }
     }
 
