@@ -1,13 +1,15 @@
 package com.ticketly.mseventseatingprojection.service.impl;
 
 import com.ticketly.mseventseatingprojection.dto.analytics.EventAnalyticsDTO;
-import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.model.EventTrendingDocument;
 import com.ticketly.mseventseatingprojection.repository.EventRepository;
 import com.ticketly.mseventseatingprojection.repository.EventTrendingRepository;
+import com.ticketly.mseventseatingprojection.repository.TrendingRepositoryCustom;
 import com.ticketly.mseventseatingprojection.service.EventAnalyticsService;
 import com.ticketly.mseventseatingprojection.service.EventTrendingService;
 import com.ticketly.mseventseatingprojection.service.GoogleAnalyticsService;
+import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class EventTrendingServiceImpl implements EventTrendingService {
     private final EventRepository eventRepository;
     private final EventAnalyticsService eventAnalyticsService;
     private final GoogleAnalyticsService googleAnalyticsService;
+    private final TrendingRepositoryCustom trendingRepositoryCustom;
+    private final EventQueryMapper eventMapper;
 
     @Override
     public Mono<EventTrendingDocument> getEventTrendingScore(String eventId) {
@@ -111,6 +115,17 @@ public class EventTrendingServiceImpl implements EventTrendingService {
         return eventTrendingRepository.findAll()
                 .sort((a, b) -> Double.compare(b.getTrendingScore(), a.getTrendingScore()))
                 .take(limit);
+    }
+    
+    @Override
+    public Flux<EventThumbnailDTO> getTopTrendingEventThumbnails(int limit) {
+        log.info("Getting top {} trending event thumbnails", limit);
+        return trendingRepositoryCustom.findTopTrendingEvents(limit)
+                .doOnNext(event -> log.info("Processing event from repository: id={}, title={}", event.getId(), event.getTitle()))
+                .map(eventMapper::mapToThumbnailDTO)
+                .doOnNext(dto -> log.info("Mapped trending event to thumbnail: id={}, title={}", dto.getId(), dto.getTitle()))
+                .doOnComplete(() -> log.info("Completed getting trending event thumbnails"))
+                .doOnError(e -> log.error("Error getting trending event thumbnails: {}", e.getMessage()));
     }
     
     /**

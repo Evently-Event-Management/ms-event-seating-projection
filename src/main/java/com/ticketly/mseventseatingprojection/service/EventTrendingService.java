@@ -35,4 +35,11 @@ public interface EventTrendingService {
      * @return Flux of trending events sorted by score
      */
     Flux<EventTrendingDocument> getTopTrendingEvents(int limit);
+    
+    /**
+     * Get top trending events as EventThumbnailDTO up to a specified limit
+     * @param limit Maximum number of events to return
+     * @return Flux of EventThumbnailDTO objects sorted by trending score
+     */
+    Flux<com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO> getTopTrendingEventThumbnails(int limit);
 }
