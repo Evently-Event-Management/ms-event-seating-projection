@@ -174,4 +174,18 @@ public class EventQueryController {
         log.info("Requested top {} trending events", limit);
         return eventTrendingService.getTopTrendingEventThumbnails(limit);
     }
+    
+    /**
+     * Get the total count of all sessions in the database.
+     *
+     * @return Mono emitting ResponseEntity with the total count of sessions.
+     */
+    @GetMapping("/sessions/count")
+    @Operation(summary = "Get total count of all sessions",
+            description = "Returns the total count of all sessions across all events in the database")
+    public Mono<ResponseEntity<Long>> getTotalSessionsCount() {
+        log.info("Requested total count of all sessions");
+        return eventQueryService.countAllSessions()
+                .map(ResponseEntity::ok);
+    }
 }

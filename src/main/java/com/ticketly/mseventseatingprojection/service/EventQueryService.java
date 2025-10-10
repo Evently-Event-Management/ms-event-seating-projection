@@ -45,7 +45,8 @@ public class EventQueryService {
     private final SeatRepository seatRepository;
 
     /**
-     * Searches for events based on various filters and returns a paginated list of event thumbnails.
+     * Searches for events based on various filters and returns a paginated list of
+     * event thumbnails.
      *
      * @param searchTerm Search keyword for event title or description.
      * @param categoryId Category ID to filter events.
@@ -62,15 +63,14 @@ public class EventQueryService {
     public Mono<Page<EventThumbnailDTO>> searchEvents(
             String searchTerm, String categoryId, Double longitude, Double latitude,
             Integer radiusKm, Instant dateFrom, Instant dateTo,
-            BigDecimal priceMin, BigDecimal priceMax, Pageable pageable
-    ) {
-        log.debug("searchEvents called with term={}, categoryId={}, location=({},{}), radius={}, dateFrom={}, dateTo={}, priceMin={}, priceMax={}, pageable={}",
+            BigDecimal priceMin, BigDecimal priceMax, Pageable pageable) {
+        log.debug(
+                "searchEvents called with term={}, categoryId={}, location=({},{}), radius={}, dateFrom={}, dateTo={}, priceMin={}, priceMax={}, pageable={}",
                 searchTerm, categoryId, longitude, latitude, radiusKm, dateFrom, dateTo, priceMin, priceMax, pageable);
 
         return eventReadRepository.searchEvents(
-                        searchTerm, categoryId, longitude, latitude, radiusKm,
-                        dateFrom, dateTo, priceMin, priceMax, pageable
-                )
+                searchTerm, categoryId, longitude, latitude, radiusKm,
+                dateFrom, dateTo, priceMin, priceMax, pageable)
                 // ✅ Delegate mapping to the mapper component
                 .map(eventPage -> eventPage.map(eventMapper::mapToThumbnailDTO))
                 .doOnNext(page -> log.info("searchEvents result: totalElements={}, pageSize={}, pageNumber={}",
@@ -87,7 +87,8 @@ public class EventQueryService {
         log.debug("getBasicEventInfo called for eventId={}", eventId);
         return eventReadRepository.findEventBasicInfoById(eventId)
                 .map(eventMapper::mapToBasicInfoDTO)
-                .doOnNext(dto -> log.info("getBasicEventInfo outcome for eventId={}: title={}", eventId, dto.getTitle()))
+                .doOnNext(
+                        dto -> log.info("getBasicEventInfo outcome for eventId={}: title={}", eventId, dto.getTitle()))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Event", "id", eventId)));
     }
 
@@ -107,9 +108,10 @@ public class EventQueryService {
                 .flatMap(discounts -> {
                     // Then fetch the sessions and map them with the discounts
                     return eventReadRepository.findSessionsByEventId(eventId, pageable)
-                            .map(sessionPage -> sessionPage.map(session ->
-                                    eventMapper.mapToSessionInfoDTO(session, discounts)))
-                            .doOnNext(page -> log.info("findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}",
+                            .map(sessionPage -> sessionPage
+                                    .map(session -> eventMapper.mapToSessionInfoDTO(session, discounts)))
+                            .doOnNext(page -> log.info(
+                                    "findSessionsByEventId outcome for eventId={}: totalSessionsOnPage={}",
                                     eventId, page.getNumberOfElements()));
                 });
     }
@@ -130,7 +132,8 @@ public class EventQueryService {
                         log.info("getSessionSeatingMap outcome for sessionId={}: seatingMapFound=false", sessionId);
                     }
                 })
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session seating map", "session_id", sessionId)));
+                .switchIfEmpty(
+                        Mono.error(new ResourceNotFoundException("Session seating map", "session_id", sessionId)));
     }
 
     /**
@@ -142,7 +145,8 @@ public class EventQueryService {
      * @return A Flux emitting the session information.
      */
     public Flux<SessionInfoDTO> findSessionsInRange(String eventId, Instant fromDate, Instant toDate) {
-        log.info("findSessionsInRange called: eventId={}, from={}, to={} (fetching sessions)", eventId, fromDate, toDate);
+        log.info("findSessionsInRange called: eventId={}, from={}, to={} (fetching sessions)", eventId, fromDate,
+                toDate);
 
         // First fetch event discounts that will be needed for all sessions
         return eventReadRepository.findPublicDiscountsByEvent(eventId)
@@ -179,7 +183,8 @@ public class EventQueryService {
                             .collectList()
                             .map(discounts -> eventMapper.mapToSessionInfoDTO(session, discounts));
                 })
-                .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId, dto.getStartTime()));
+                .doOnNext(dto -> log.info("getSessionById outcome for sessionId={}: found=true startTime={}", sessionId,
+                        dto.getStartTime()));
     }
 
     /**
@@ -196,19 +201,23 @@ public class EventQueryService {
     }
 
     /**
-     * Fetches a single active discount by its code, verifying it's applicable to the given session.
+     * Fetches a single active discount by its code, verifying it's applicable to
+     * the given session.
      *
      * @param sessionId The ID of the session.
      * @param code      The discount code.
-     * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
+     * @return A Mono emitting the DiscountDetailsDTO or empty if not
+     *         found/applicable.
      */
     public Mono<DiscountDetailsDTO> getDiscountByCodeForSession(String sessionId, String code) {
         log.debug("getDiscountByCodeForSession called for sessionId={}, code={}", sessionId, code);
         return eventReadRepository.findActiveDiscountByCodeAndSession(sessionId, code)
                 .map(eventMapper::mapToDiscountDetailsDTO)
                 .doOnSuccess(dto -> {
-                    if (dto != null) log.info("Discount '{}' found for session {}", code, sessionId);
-                    else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
+                    if (dto != null)
+                        log.info("Discount '{}' found for session {}", code, sessionId);
+                    else
+                        log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
                 });
     }
 
@@ -217,17 +226,31 @@ public class EventQueryService {
      * @param eventId   The ID of the event.
      * @param sessionId The ID of the session.
      * @param code      The discount code.
-     * @return A Mono emitting the DiscountDetailsDTO or empty if not found/applicable.
+     * @return A Mono emitting the DiscountDetailsDTO or empty if not
+     *         found/applicable.
      */
     public Mono<DiscountDetailsDTO> getDiscountByCodeForEventAndSession(String eventId, String sessionId, String code) {
-        log.debug("getDiscountByCodeForEventAndSession called for eventId={}, sessionId={}, code={}", eventId, sessionId, code);
+        log.debug("getDiscountByCodeForEventAndSession called for eventId={}, sessionId={}, code={}", eventId,
+                sessionId, code);
         return eventReadRepository.findActiveDiscountByCodeAndEventAndSession(eventId, sessionId, code)
                 .map(eventMapper::mapToDiscountDetailsDTO)
                 .doOnSuccess(dto -> {
                     if (dto != null)
                         log.info("Discount '{}' found for event {} and session {}", code, eventId, sessionId);
-                    else log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
+                    else
+                        log.info("Discount '{}' not found or not applicable for session {}", code, sessionId);
                 });
+    }
+
+    /**
+     * Counts the total number of sessions across all events in the database.
+     *
+     * @return Mono emitting the total count of sessions.
+     */
+    public Mono<Long> countAllSessions() {
+        log.debug("countAllSessions called");
+        return eventReadRepository.countAllSessions()
+                .doOnSuccess(count -> log.info("Total number of sessions in database: {}", count));
     }
 
     public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {
@@ -235,9 +258,9 @@ public class EventQueryService {
         String sessionId = request.getSession_id().toString();
         List<String> seatIds = request.getSeat_ids().stream().map(UUID::toString).toList();
 
-
         Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId);
-        Mono<List<EventDocument.SeatInfo>> seatsMono = seatRepository.findSeatDetails(eventId, sessionId, seatIds).collectList();
+        Mono<List<EventDocument.SeatInfo>> seatsMono = seatRepository.findSeatDetails(eventId, sessionId, seatIds)
+                .collectList();
 
         // ✅ FIX 1: Wrap the potentially empty discount Mono in an Optional
         Mono<Optional<EventDocument.DiscountInfo>> optionalDiscountMono = Mono.justOrEmpty(request.getDiscount_id())
@@ -254,21 +277,26 @@ public class EventQueryService {
 
                     // === Perform Validations ===
 
-                    if (statuses.eventStatus() != EventStatus.APPROVED || statuses.sessionStatus() != SessionStatus.ON_SALE) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event or session is not currently on sale."));
+                    if (statuses.eventStatus() != EventStatus.APPROVED
+                            || statuses.sessionStatus() != SessionStatus.ON_SALE) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Event or session is not currently on sale."));
                     }
 
                     if (seats.size() != seatIds.size()) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some of the selected seats could not be found."));
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Some of the selected seats could not be found."));
                     }
                     if (seats.stream().anyMatch(s -> s.getStatus() != ReadModelSeatStatus.AVAILABLE)) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some selected seats are no longer available."));
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Some selected seats are no longer available."));
                     }
 
                     if (request.getDiscount_id() != null) {
                         // Check if the discount was actually found
                         if (optionalDiscount.isEmpty()) {
-                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The provided discount is not valid for this event."));
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "The provided discount is not valid for this event."));
                         }
 
                         EventDocument.DiscountInfo discount = optionalDiscount.get();
@@ -277,14 +305,15 @@ public class EventQueryService {
                                 (discount.getActiveFrom() == null || !discount.getActiveFrom().isAfter(now)) &&
                                 (discount.getExpiresAt() == null || !discount.getExpiresAt().isBefore(now));
                         if (!isDiscountActive) {
-                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The provided discount is not currently active."));
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "The provided discount is not currently active."));
                         }
 
-                        //Check if the discount is within usage limits
+                        // Check if the discount is within usage limits
                         if (discount.getMaxUsage() != null && discount.getCurrentUsage() != null) {
                             if (discount.getCurrentUsage() >= discount.getMaxUsage()) {
                                 return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                    "This discount has reached its maximum usage limit."));
+                                        "This discount has reached its maximum usage limit."));
                             }
                         }
                     }

@@ -158,4 +158,11 @@ public interface EventReadRepositoryCustom {
      * @return Mono emitting the DiscountInfo if found and active, otherwise empty.
      */
     Mono<EventDocument.DiscountInfo> findActiveDiscountByCodeAndSession(String sessionId, String code);
+    
+    /**
+     * Counts the total number of sessions across all events in the database.
+     *
+     * @return Mono emitting the total count of sessions.
+     */
+    Mono<Long> countAllSessions();
 }
