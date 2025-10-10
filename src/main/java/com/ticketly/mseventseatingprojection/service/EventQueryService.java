@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.service;
 
+import com.ticketly.mseventseatingprojection.dto.SessionCountDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.internal.EventAndSessionStatus;
 import com.ticketly.mseventseatingprojection.dto.internal.PreOrderValidationResponse;
@@ -245,12 +246,17 @@ public class EventQueryService {
     /**
      * Counts the total number of sessions across all events in the database.
      *
-     * @return Mono emitting the total count of sessions.
+     * @return Mono emitting SessionCountDTO containing the total count of sessions.
      */
-    public Mono<Long> countAllSessions() {
+    public Mono<SessionCountDTO> countAllSessions() {
         log.debug("countAllSessions called");
         return eventReadRepository.countAllSessions()
-                .doOnSuccess(count -> log.info("Total number of sessions in database: {}", count));
+                .map(count -> {
+                    log.info("Total number of sessions in database: {}", count);
+                    return SessionCountDTO.builder()
+                            .totalSessions(count)
+                            .build();
+                });
     }
 
     public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {

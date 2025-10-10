@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.SessionCountDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
@@ -178,12 +179,12 @@ public class EventQueryController {
     /**
      * Get the total count of all sessions in the database.
      *
-     * @return Mono emitting ResponseEntity with the total count of sessions.
+     * @return Mono emitting ResponseEntity with SessionCountDTO containing the total count of sessions.
      */
     @GetMapping("/sessions/count")
     @Operation(summary = "Get total count of all sessions",
             description = "Returns the total count of all sessions across all events in the database")
-    public Mono<ResponseEntity<Long>> getTotalSessionsCount() {
+    public Mono<ResponseEntity<SessionCountDTO>> getTotalSessionsCount() {
         log.info("Requested total count of all sessions");
         return eventQueryService.countAllSessions()
                 .map(ResponseEntity::ok);
