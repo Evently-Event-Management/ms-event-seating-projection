@@ -47,6 +47,15 @@ aws:
   s3:
     public-base-url: ${AWS_S3_PUBLIC_URL:https://ticketly-storage.s3.us-east-1.amazonaws.com}
 
+google:
+  analytics:
+    property-id: ${GA_PROPERTY_ID:000000000}
+    client-email: ${GOOGLE_CLIENT_EMAIL:service-account@project.iam.gserviceaccount.com}
+    private-key: ${GOOGLE_PRIVATE_KEY:your-private-key}
+
+trending:
+  update-schedule: ${TRENDING_UPDATE_SCHEDULE:0 0 * * * *}  # Default: Every hour
+
 springdoc:
   swagger-ui:
     path: /docs/swagger-ui.html

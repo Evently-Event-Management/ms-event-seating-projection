@@ -3,7 +3,11 @@ package com.ticketly.mseventseatingprojection.controller;
 import com.ticketly.mseventseatingprojection.dto.analytics.EventAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.SessionAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.SessionSummaryDTO;
+import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.EventTrendingDocument;
 import com.ticketly.mseventseatingprojection.service.EventAnalyticsService;
+import com.ticketly.mseventseatingprojection.service.EventQueryService;
+import com.ticketly.mseventseatingprojection.service.EventTrendingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +18,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -26,6 +31,7 @@ import reactor.core.publisher.Mono;
 public class EventAnalyticsController {
 
     private final EventAnalyticsService eventAnalyticsService;
+    private final EventTrendingService eventTrendingService;
 
     /**
      * Get comprehensive analytics for an event.
@@ -75,5 +81,19 @@ public class EventAnalyticsController {
         return eventAnalyticsService.getSessionAnalytics(eventId, sessionId , jwt.getSubject())
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * Get top trending events.
+     *
+     * @param limit The maximum number of events to return.
+     * @return Flux emitting trending events ordered by trending score.
+     */
+    @GetMapping("/trending")
+    @Operation(summary = "Get top trending events",
+            description = "Returns events sorted by their trending score which is calculated based on views, purchases, and reservations")
+    public Flux<EventTrendingDocument> getTopTrendingEvents(@RequestParam(defaultValue = "10") int limit) {
+        log.info("Requested top {} trending events", limit);
+        return eventTrendingService.getTopTrendingEvents(limit);
     }
 }
