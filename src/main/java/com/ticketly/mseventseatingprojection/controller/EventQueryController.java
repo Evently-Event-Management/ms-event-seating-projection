@@ -1,11 +1,15 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.SessionCountDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.service.EventQueryService;
+import com.ticketly.mseventseatingprojection.service.EventTrendingService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -29,9 +34,12 @@ import java.util.List;
 @RequestMapping("/v1/events")
 @RequiredArgsConstructor
 @EnableReactiveMethodSecurity
+@Slf4j
 public class EventQueryController {
 
     private final EventQueryService eventQueryService;
+    private final EventTrendingService eventTrendingService;
+
 
     /**
      * Search for events based on filters and pagination.
@@ -152,5 +160,33 @@ public class EventQueryController {
         return eventQueryService.getDiscountByCodeForEventAndSession(eventId, sessionId, code)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Get top trending events.
+     *
+     * @param limit The maximum number of events to return.
+     * @return Flux emitting event thumbnails ordered by trending score.
+     */
+    @GetMapping("/trending")
+    @Operation(summary = "Get top trending events",
+            description = "Returns events sorted by their trending score which is calculated based on views, purchases, and reservations")
+    public Flux<EventThumbnailDTO> getTopTrendingEvents(@RequestParam(defaultValue = "10") int limit) {
+        log.info("Requested top {} trending events", limit);
+        return eventTrendingService.getTopTrendingEventThumbnails(limit);
+    }
+    
+    /**
+     * Get the total count of all sessions in the database.
+     *
+     * @return Mono emitting ResponseEntity with SessionCountDTO containing the total count of sessions.
+     */
+    @GetMapping("/sessions/count")
+    @Operation(summary = "Get total count of all sessions",
+            description = "Returns the total count of all sessions across all events in the database")
+    public Mono<ResponseEntity<SessionCountDTO>> getTotalSessionsCount() {
+        log.info("Requested total count of all sessions");
+        return eventQueryService.countAllSessions()
+                .map(ResponseEntity::ok);
     }
 }

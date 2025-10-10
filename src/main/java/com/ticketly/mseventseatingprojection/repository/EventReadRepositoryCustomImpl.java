@@ -419,4 +419,25 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", EventDocument.DiscountInfo.class).singleOrEmpty();
     }
+
+    @Override
+    public Mono<Long> countAllSessions() {
+        AggregationOperation unwindSessions = unwind("sessions");
+        AggregationOperation countStage = count().as("totalSessions");
+
+        TypedAggregation<EventDocument> aggregation = newAggregation(
+                EventDocument.class,
+                unwindSessions,
+                countStage
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", Map.class)
+                .singleOrEmpty()
+                .map(result -> {
+                    // ++ FIX: Treat the result as a Number and convert safely ++
+                    Number totalSessions = (Number) result.get("totalSessions");
+                    return totalSessions != null ? totalSessions.longValue() : 0L;
+                })
+                .defaultIfEmpty(0L);
+    }
 }
