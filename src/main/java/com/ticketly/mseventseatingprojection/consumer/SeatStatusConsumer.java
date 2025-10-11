@@ -3,7 +3,7 @@ package com.ticketly.mseventseatingprojection.consumer;
 import com.ticketly.mseventseatingprojection.dto.SeatStatusChangeEventDto;
 import com.ticketly.mseventseatingprojection.dto.read.SeatStatusUpdateDto;
 import com.ticketly.mseventseatingprojection.model.ReadModelSeatStatus;
-import com.ticketly.mseventseatingprojection.service.SeatStatusService;
+import com.ticketly.mseventseatingprojection.service.SeatService;
 import com.ticketly.mseventseatingprojection.service.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import java.util.UUID;
 public class SeatStatusConsumer {
 
     private final SseService sseService;
-    private final SeatStatusService seatStatusService;
+    private final SeatService seatService;
 
     /**
      * Handles Kafka events for seat status changes.
@@ -90,7 +90,7 @@ public class SeatStatusConsumer {
      * Common method to update MongoDB and conditionally publish SSE event.
      */
     private void updateStatusAndPublish(UUID sessionId, List<UUID> seatIds, ReadModelSeatStatus status, SeatStatusUpdateDto update, Acknowledgment acknowledgment) {
-        seatStatusService.updateSeatStatus(sessionId, seatIds, status)
+        seatService.updateSeatStatus(sessionId, seatIds, status)
             .doOnSuccess(success -> {
                 if (success) {
                     log.info("Successfully updated seat status to {} in MongoDB", status);
