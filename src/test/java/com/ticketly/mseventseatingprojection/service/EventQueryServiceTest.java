@@ -1,7 +1,6 @@
 package com.ticketly.mseventseatingprojection.service;
 
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
-import com.ticketly.mseventseatingprojection.dto.internal.PreOrderValidationResponse;
 import com.ticketly.mseventseatingprojection.dto.read.EventBasicInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.EventThumbnailDTO;
 import com.ticketly.mseventseatingprojection.exception.ResourceNotFoundException;
@@ -10,7 +9,6 @@ import com.ticketly.mseventseatingprojection.repository.EventReadRepositoryCusto
 import com.ticketly.mseventseatingprojection.repository.EventRepositoryCustom;
 import com.ticketly.mseventseatingprojection.repository.SeatRepository;
 import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
-import dto.CreateOrderRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,9 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
