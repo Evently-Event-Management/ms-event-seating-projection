@@ -48,6 +48,15 @@ aws:
     public-base-url: ${AWS_S3_PUBLIC_URL:https://ticketly-storage.s3.us-east-1.amazonaws.com}
 
 google:
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
   analytics:
     property-id: ${GA_PROPERTY_ID:000000000}
     client-email: ${GOOGLE_CLIENT_EMAIL:service-account@project.iam.gserviceaccount.com}
