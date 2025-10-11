@@ -1,0 +1,77 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: projection-service-test
+  webflux:
+    base-path: /api/event-query
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating-test}
+      auto-index-creation: true
+  kafka:
+    consumer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      group-id: ${KAFKA_GROUP_ID:event-query-service-test}
+      auto-offset-reset: earliest
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://auth.ticketly.com:8080/realms/event-ticketing/protocol/openid-connect/certs}
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://auth.ticketly.com:8080/realms/event-ticketing}
+        registration:
+          keycloak-m2m-client:
+            provider: keycloak
+            client-id: ${EVENT_PROJECTION_CLIENT_ID:event-projection-service-client}
+            client-secret: ${EVENT_PROJECTION_CLIENT_SECRET:test-secret}
+            authorization-grant-type: client_credentials
+            scope: internal-api
+
+logging:
+  level:
+    root: INFO
+    com.ticketly: DEBUG
+
+aws:
+  s3:
+    public-base-url: ${AWS_S3_PUBLIC_URL:https://test-storage.s3.amazonaws.com}
+
+# Adding the missing Google Analytics properties
+google:
+  analytics:
+    property-id: ${GA_PROPERTY_ID:000000000}
+    client-email: ${GOOGLE_CLIENT_EMAIL:service-account@project.iam.gserviceaccount.com}
+    private-key: ${GOOGLE_PRIVATE_KEY:fake-key}
+    client-id: ${GOOGLE_CLIENT_ID:fake-client-id}
+    private-key-id: ${GOOGLE_PRIVATE_KEY_ID:fake-key-id}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  analytics:
+    property-id: ${GA_PROPERTY_ID:000000000}
+    client-email: ${GOOGLE_CLIENT_EMAIL:service-account@project.iam.gserviceaccount.com}
+    private-key: ${GOOGLE_PRIVATE_KEY:fake-key}
+    client-id: ${GOOGLE_CLIENT_ID:fake-client-id}
+    private-key-id: ${GOOGLE_PRIVATE_KEY_ID:fake-key-id}
+
+trending:
+  update-schedule: ${TRENDING_UPDATE_SCHEDULE:0 0 * * * *}  # Default: Every hour
+
+services:
+  event-command:
+    base-url: ${COMMAND_SERVICE_URL:http://localhost:8081/api/event-seating}
+
+webclient:
+    max-in-memory-size: ${WEBCLIENT_MAX_IN_MEMORY_SIZE:20971520} # 20MB
