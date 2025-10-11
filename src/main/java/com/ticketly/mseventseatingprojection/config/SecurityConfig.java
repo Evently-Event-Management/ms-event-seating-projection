@@ -25,7 +25,9 @@ public class SecurityConfig {
                                 "/v1/categories/**",
                                 "/v1/sessions/**",
                                 "/v1/sse/**",
-                                "/oauth2/**"
+                                "/oauth2/**",
+                                "/health",
+                                "/actuator/**"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )
