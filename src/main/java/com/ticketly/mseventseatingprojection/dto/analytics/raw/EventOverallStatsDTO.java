@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EventOverallStatsDTO {
+    private String _id; // MongoDB _id field from aggregation (event ID)
     private BigDecimal totalRevenue;
     private Integer totalTicketsSold;
     private Integer totalEventCapacity;

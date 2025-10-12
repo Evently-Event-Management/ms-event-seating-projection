@@ -5,6 +5,7 @@ import com.ticketly.mseventseatingprojection.dto.analytics.SessionAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.SessionSummaryDTO;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import java.util.List;
 
 /**
  * Service interface for event analytics operations
@@ -57,4 +58,19 @@ public interface EventAnalyticsService {
      * @return Flux of session summary data
      */
     Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId, String userId);
+
+    /**
+     * Get analytics for multiple events in batch
+     * @param eventIds List of event IDs to analyze
+     * @return Flux of event analytics data
+     */
+    Flux<EventAnalyticsDTO> getBatchEventAnalytics(List<String> eventIds);
+
+    /**
+     * Get analytics for multiple events in batch with user context
+     * @param eventIds List of event IDs to analyze
+     * @param userId The ID of the user requesting the analytics
+     * @return Flux of event analytics data
+     */
+    Flux<EventAnalyticsDTO> getBatchEventAnalytics(List<String> eventIds, String userId);
 }

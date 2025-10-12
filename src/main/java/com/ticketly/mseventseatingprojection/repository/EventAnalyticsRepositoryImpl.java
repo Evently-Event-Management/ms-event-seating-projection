@@ -425,5 +425,56 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 finalProjection
         );
     }
+    
+    @Override
+    public Flux<EventOverallStatsDTO> getBatchEventOverallStats(List<String> eventIds) {
+        // This pipeline is now structured to handle multiple events correctly.
+        Aggregation aggregation = newAggregation(
+                // 1. Match all requested events
+                match(Criteria.where("_id").in(eventIds)),
+
+                // 2. Unwind sessions to access seat data
+                unwind("sessions"),
+
+                // 3. Use the UNIFY_SEATS_OPERATION to create 'allSeats' array for each session
+                // Note: The UNIFY_SEATS_OPERATION should be the 'whole-session' version that doesn't unwind blocks itself.
+                UNIFY_SEATS_OPERATION,
+
+                // 4. Unwind the unified 'allSeats' array to get a stream of individual seats
+                unwind("allSeats"),
+
+                // 5. Group by the PARENT EVENT ID to calculate stats for each event
+                group("_id") // Group by the root document's _id (the eventId)
+                        .first("title").as("eventTitle") // Capture the event title for the final DTO
+                        .sum(
+                                ConditionalOperators.when(Criteria.where("allSeats.status").is("BOOKED"))
+                                        .then(ConvertOperators.Convert.convertValue("$allSeats.tier.price").to("decimal"))
+                                        .otherwise(0)
+                        ).as("totalRevenue")
+                        .sum(
+                                ConditionalOperators.when(Criteria.where("allSeats.status").is("BOOKED")).then(1).otherwise(0)
+                        ).as("totalTicketsSold")
+                        .count().as("totalEventCapacity"),
+
+                // 6. Project to the final DTO shape
+                project("totalRevenue", "totalTicketsSold", "totalEventCapacity", "eventTitle")
+                        .and("_id").as("eventId") // Rename _id to eventId
+                        .andExclude("_id")
+                        // You can calculate derived metrics here as well if needed
+                        .and(
+                                ConditionalOperators.when(Criteria.where("totalEventCapacity").gt(0))
+                                        .thenValueOf(ArithmeticOperators.Multiply.valueOf(100)
+                                                .multiplyBy(ArithmeticOperators.Divide.valueOf("totalTicketsSold").divideBy("totalEventCapacity")))
+                                        .otherwise(0)
+                        ).as("overallSellOutPercentage")
+                        .and(
+                                ConditionalOperators.when(Criteria.where("totalTicketsSold").gt(0))
+                                        .thenValueOf(ArithmeticOperators.Divide.valueOf("totalRevenue").divideBy("totalTicketsSold"))
+                                        .otherwise(0)
+                        ).as("averageRevenuePerTicket")
+        );
+
+        return reactiveMongoTemplate.aggregate(aggregation, "events", EventOverallStatsDTO.class);
+    }
 }
 

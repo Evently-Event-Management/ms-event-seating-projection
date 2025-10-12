@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -180,5 +182,86 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                         return Mono.error(new UnauthorizedAccessException("Session analytics", sessionId, userId));
                     }
                 });
+    }
+
+    @Override
+    public Flux<EventAnalyticsDTO> getBatchEventAnalytics(List<String> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return Flux.empty();
+        }
+
+        // Get basic event info for titles
+        Flux<EventDocument> eventDocuments = eventRepository.findAllById(eventIds);
+
+        return eventDocuments.collectMap(
+                EventDocument::getId,
+                EventDocument::getTitle
+            )
+            .flatMapMany(eventTitleMap -> {
+                // Get overall statistics for all events in batch
+                return eventAnalyticsRepository.getBatchEventOverallStats(eventIds)
+                    .flatMap(stats -> {
+                        String eventId = stats.get_id(); // Using _id from the aggregation
+                        String eventTitle = eventTitleMap.getOrDefault(eventId, "Unknown Event");
+
+                        // For each event, get session status counts and tier analytics
+                        Mono<Map<SessionStatus, Integer>> sessionStatusMono = eventAnalyticsRepository
+                            .getSessionStatusCounts(eventId)
+                            .collectMap(SessionStatusCountDTO::getStatus, SessionStatusCountDTO::getCount)
+                            .defaultIfEmpty(Collections.emptyMap());
+
+                        Mono<List<TierSalesDTO>> tierAnalyticsMono = eventAnalyticsRepository
+                            .getTierAnalytics(eventId)
+                            .collectList()
+                            .defaultIfEmpty(Collections.emptyList());
+
+                        // Combine all data for this event
+                        return Mono.zip(
+                                Mono.just(stats),
+                                sessionStatusMono,
+                                tierAnalyticsMono
+                            )
+                            .map(tuple -> {
+                                EventOverallStatsDTO statsData = tuple.getT1();
+                                Map<SessionStatus, Integer> sessionStatusCounts = tuple.getT2();
+                                List<TierSalesDTO> tierAnalytics = tuple.getT3();
+
+                                // Build the final DTO for this event
+                                return EventAnalyticsDTO.builder()
+                                    .eventId(eventId)
+                                    .eventTitle(eventTitle)
+                                    .totalRevenue(statsData.getTotalRevenue())
+                                    .averageRevenuePerTicket(statsData.getAverageRevenuePerTicket())
+                                    .totalTicketsSold(statsData.getTotalTicketsSold())
+                                    .totalEventCapacity(statsData.getTotalEventCapacity())
+                                    .overallSellOutPercentage(statsData.getOverallSellOutPercentage())
+                                    .sessionStatusBreakdown(sessionStatusCounts)
+                                    .salesByTier(tierAnalytics)
+                                    .build();
+                            });
+                    });
+            });
+    }
+
+    @Override
+    public Flux<EventAnalyticsDTO> getBatchEventAnalytics(List<String> eventIds, String userId) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return Flux.empty();
+        }
+
+        // Check ownership for all requested events
+        return Flux.fromIterable(eventIds)
+            .flatMap(eventId ->
+                eventOwnershipService.isUserOwnerOfEvent(userId, eventId)
+                    .filter(Boolean::booleanValue)
+                    .map(isOwner -> eventId)
+            )
+            .collectList()
+            .flatMapMany(authorizedEventIds -> {
+                if (authorizedEventIds.isEmpty()) {
+                    return Flux.empty();
+                }
+                return getBatchEventAnalytics(authorizedEventIds);
+            });
     }
 }

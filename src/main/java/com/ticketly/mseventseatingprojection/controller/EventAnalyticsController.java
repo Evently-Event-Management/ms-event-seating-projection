@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.analytics.EventAnalyticsBatchRequest;
 import com.ticketly.mseventseatingprojection.dto.analytics.EventAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.SessionAnalyticsDTO;
 import com.ticketly.mseventseatingprojection.dto.analytics.SessionSummaryDTO;
@@ -11,10 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -41,6 +41,20 @@ public class EventAnalyticsController {
         return eventAnalyticsService.getEventAnalytics(eventId, jwt.getSubject())
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * Get comprehensive analytics for multiple events in batch.
+     *
+     * @param req List of event IDs.
+     * @return Flux emitting EventAnalyticsDTO for each event.
+     */
+    @PostMapping("/events/batch/individual")
+    @Operation(summary = "Get comprehensive analytics for multiple events in batch",
+            description = "Returns aggregated analytics for multiple events in a single request. Only returns data for events the user is authorized to access.")
+    public Flux<EventAnalyticsDTO> getBatchEventAnalytics(@RequestBody EventAnalyticsBatchRequest req, @AuthenticationPrincipal Jwt jwt) {
+        log.info("User {} requested batch analytics for {} events", jwt.getSubject(), req.getEventIds().size());
+        return eventAnalyticsService.getBatchEventAnalytics(req.getEventIds(), jwt.getSubject());
     }
 
     /**

@@ -5,7 +5,10 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Repository
 public interface EventRepository extends ReactiveMongoRepository<EventDocument, String> {
@@ -152,6 +155,16 @@ public interface EventRepository extends ReactiveMongoRepository<EventDocument, 
      */
     @Query(value = "{ 'id': ?0 }", fields = "{ 'title': 1 }")
     Mono<EventDocument> findEventTitleById(String eventId);
+
+    /**
+     * Efficiently fetches titles for multiple events by their IDs using a projection.
+     * Spring Data will automatically implement this method.
+     *
+     * @param eventIds The list of event IDs to find.
+     * @return A Flux emitting EventDocuments each containing ONLY the _id and title fields.
+     */
+    @Query(value = "{ 'id': { $in: ?0 } }", fields = "{ 'title': 1 }")
+    Flux<EventDocument> findEventTitlesByIds(List<String> eventIds);
 
     /**
      * Atomically removes a specific discount sub-document from the discounts array

@@ -10,6 +10,8 @@ import com.ticketly.mseventseatingprojection.model.EventDocument;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * Repository interface for event analytics operations
  */
@@ -100,4 +102,12 @@ public interface EventAnalyticsRepository {
      * @return A Flux containing block occupancy details
      */
     Flux<BlockOccupancyDTO> getBlockOccupancy(String eventId, String sessionId);
+    
+    /**
+     * Get overall event statistics for multiple events in batch using aggregation
+     *
+     * @param eventIds The list of event IDs to analyze
+     * @return A Flux containing the overall event statistics for each event
+     */
+    Flux<EventOverallStatsDTO> getBatchEventOverallStats(List<String> eventIds);
 }
