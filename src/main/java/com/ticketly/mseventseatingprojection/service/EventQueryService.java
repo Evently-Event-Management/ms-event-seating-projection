@@ -262,9 +262,10 @@ public class EventQueryService {
     public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {
         String eventId = request.getEvent_id().toString();
         String sessionId = request.getSession_id().toString();
+        String organizationId = request.getOrganization_id().toString();
         List<String> seatIds = request.getSeat_ids().stream().map(UUID::toString).toList();
 
-        Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId);
+        Mono<EventAndSessionStatus> statusMono = eventRepositoryCustom.findEventAndSessionStatus(eventId, sessionId, organizationId);
         Mono<List<EventDocument.SeatInfo>> seatsMono = seatRepository.findSeatDetails(eventId, sessionId, seatIds)
                 .collectList();
 

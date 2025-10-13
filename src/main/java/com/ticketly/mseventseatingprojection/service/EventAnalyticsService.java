@@ -57,4 +57,21 @@ public interface EventAnalyticsService {
      * @return Flux of session summary data
      */
     Flux<SessionSummaryDTO> getAllSessionsAnalytics(String eventId, String userId);
+
+    /**
+     * Get basic summary for a specific session in an event
+     * @param eventId The ID of the event
+     * @param sessionId The ID of the session to get summary for
+     * @return Mono of session summary data
+     */
+    Mono<SessionSummaryDTO> getSessionSummary(String eventId, String sessionId);
+
+    /**
+     * Get basic summary for a specific session in an event with user context
+     * @param eventId The ID of the event
+     * @param sessionId The ID of the session to get summary for
+     * @param userId The ID of the user requesting the summary
+     * @return Mono of session summary data
+     */
+    Mono<SessionSummaryDTO> getSessionSummary(String eventId, String sessionId, String userId);
 }

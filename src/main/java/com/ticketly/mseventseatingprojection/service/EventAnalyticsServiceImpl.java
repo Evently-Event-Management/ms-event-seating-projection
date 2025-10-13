@@ -181,4 +181,22 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
                     }
                 });
     }
+
+    @Override
+    public Mono<SessionSummaryDTO> getSessionSummary(String eventId, String sessionId) {
+        return eventAnalyticsRepository.getSessionSummary(eventId, sessionId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session not found with ID: " + sessionId)));
+    }
+
+    @Override
+    public Mono<SessionSummaryDTO> getSessionSummary(String eventId, String sessionId, String userId) {
+        return eventOwnershipService.isUserOwnerOfEvent(userId, eventId)
+                .flatMap(isOwner -> {
+                    if (isOwner) {
+                        return getSessionSummary(eventId, sessionId);
+                    } else {
+                        return Mono.error(new UnauthorizedAccessException("Session summary", sessionId, userId));
+                    }
+                });
+    }
 }

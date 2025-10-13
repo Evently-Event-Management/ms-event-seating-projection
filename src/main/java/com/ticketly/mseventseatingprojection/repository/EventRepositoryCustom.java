@@ -47,5 +47,5 @@ public interface EventRepositoryCustom {
      * @param sessionId The ID of the session.
      * @return A Mono emitting the status information.
      */
-    Mono<EventAndSessionStatus> findEventAndSessionStatus(String eventId, String sessionId);
+    Mono<EventAndSessionStatus> findEventAndSessionStatus(String eventId, String sessionId, String organizationId);
 }

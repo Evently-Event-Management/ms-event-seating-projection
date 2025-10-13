@@ -84,10 +84,11 @@ public class EventRepositoryCustomImpl implements EventRepositoryCustom {
 
 
     @Override
-    public Mono<EventAndSessionStatus> findEventAndSessionStatus(String eventId, String sessionId) {
+    public Mono<EventAndSessionStatus> findEventAndSessionStatus(String eventId, String sessionId, String organizationId) {
         Aggregation aggregation = Aggregation.newAggregation(
                 // 1. Match the parent event
-                match(Criteria.where("_id").is(eventId)),
+                match(Criteria.where("_id").is(eventId)
+                        .and("organization._id").is(organizationId)),
                 // 2. Project just the event status and the specific session we need
                 project("status")
                         .and(ArrayOperators.Filter.filter("sessions")

@@ -58,6 +58,26 @@ public class EventAnalyticsController {
     }
 
     /**
+     * Get summary for a specific session in an event.
+     *
+     * @param eventId The event ID.
+     * @param sessionId The session ID.
+     * @return Mono emitting ResponseEntity with SessionSummaryDTO or not found.
+     */
+    @GetMapping("/events/{eventId}/sessions/{sessionId}/summary")
+    @Operation(summary = "Get summary for a specific session",
+            description = "Returns basic summary for a specific session including revenue, tickets sold, and capacity metrics")
+    public Mono<ResponseEntity<SessionSummaryDTO>> getSessionSummary(
+            @PathVariable String eventId,
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal Jwt jwt) {
+        log.info("User {} requested summary for session {} of event {}", jwt.getSubject(), sessionId, eventId);
+        return eventAnalyticsService.getSessionSummary(eventId, sessionId, jwt.getSubject())
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
      * Get detailed analytics for a specific session.
      *
      * @param eventId The event ID.
