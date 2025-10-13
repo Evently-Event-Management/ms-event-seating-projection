@@ -61,7 +61,6 @@ public class EventQueryMapper extends BaseMapper {
                         ? event.getCoverPhotos().getFirst()
                         : null)
                 .organizationName(event.getOrganization().getName())
-                .organizationId(event.getOrganization().getId())
                 .categoryName(event.getCategory().getName())
                 .discounts(availableDiscounts)
                 .earliestSession(sessionInfo)
