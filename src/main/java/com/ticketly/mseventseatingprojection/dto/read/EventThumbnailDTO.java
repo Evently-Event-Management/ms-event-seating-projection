@@ -14,6 +14,7 @@ public class EventThumbnailDTO {
     private String title;
     private String coverPhotoUrl; // Only the first one
     private String organizationName;
+    private String organizationId;
     private String categoryName;
     private EarliestSessionInfo earliestSession;
     private BigDecimal startingPrice;
