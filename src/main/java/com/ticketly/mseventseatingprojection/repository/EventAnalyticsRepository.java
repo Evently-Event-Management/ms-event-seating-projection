@@ -101,3 +101,4 @@ public interface EventAnalyticsRepository {
      */
     Flux<BlockOccupancyDTO> getBlockOccupancy(String eventId, String sessionId);
 }
+

@@ -165,4 +165,6 @@ public interface EventReadRepositoryCustom {
      * @return Mono emitting the total count of sessions.
      */
     Mono<Long> countAllSessions();
+
+    Mono<EventDocument> findEventBySessionId(String sessionId);
 }

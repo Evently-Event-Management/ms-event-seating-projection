@@ -1,5 +1,6 @@
 package com.ticketly.mseventseatingprojection.controller;
 
+import com.ticketly.mseventseatingprojection.dto.ExtendedSessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionCountDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.read.DiscountDetailsDTO;
@@ -188,5 +189,21 @@ public class EventQueryController {
         log.info("Requested total count of all sessions");
         return eventQueryService.countAllSessions()
                 .map(ResponseEntity::ok);
+    }
+
+    /**
+     * Get extended session information by session ID.
+     *
+     * @param sessionId The session ID.
+     * @return Mono emitting ResponseEntity with ExtendedSessionInfoDTO or not found.
+     */
+    @GetMapping("/sessions/{sessionId}/extended-info")
+    @Operation(summary = "Get extended session information by ID",
+            description = "Returns extended session information including event ID and event title for a given session ID")
+    public Mono<ResponseEntity<ExtendedSessionInfoDTO>> getExtendedSessionInfo(@PathVariable String sessionId) {
+        log.info("Requested extended session info for sessionId={}", sessionId);
+        return eventQueryService.getExtendedSessionInfoById(sessionId)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }

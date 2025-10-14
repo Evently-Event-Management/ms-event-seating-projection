@@ -15,6 +15,7 @@ import org.springframework.data.geo.Point;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.*;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -439,5 +440,20 @@ public class EventReadRepositoryCustomImpl implements EventReadRepositoryCustom 
                     return totalSessions != null ? totalSessions.longValue() : 0L;
                 })
                 .defaultIfEmpty(0L);
+    }
+
+
+    @Override
+    public Mono<EventDocument> findEventBySessionId(String sessionId) {
+        // Find the event document containing a session by session ID, excluding the layoutData
+        Query query = new Query(Criteria.where("sessions.id").is(sessionId));
+
+        // Exclude the layoutData from all sessions to minimize response size
+        query.fields().exclude("sessions.layoutData");
+
+        return reactiveMongoTemplate.findOne(
+                query,
+                EventDocument.class
+        );
     }
 }

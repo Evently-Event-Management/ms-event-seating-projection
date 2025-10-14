@@ -1,7 +1,9 @@
 package com.ticketly.mseventseatingprojection.service;
 
+import com.ticketly.mseventseatingprojection.dto.ExtendedSessionInfoDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionCountDTO;
 import com.ticketly.mseventseatingprojection.dto.SessionInfoDTO;
+import com.ticketly.mseventseatingprojection.dto.VenueDetailsDTO;
 import com.ticketly.mseventseatingprojection.dto.internal.EventAndSessionStatus;
 import com.ticketly.mseventseatingprojection.dto.internal.PreOrderValidationResponse;
 import com.ticketly.mseventseatingprojection.dto.internal.SeatDetailsResponse;
@@ -335,5 +337,50 @@ public class EventQueryService {
                             .discount(eventMapper.mapToDiscountDetailsDTO(optionalDiscount.orElse(null)))
                             .build());
                 });
+    }
+
+    /**
+     * Fetches extended session information by session ID, including the event ID it belongs to.
+     * Does not include the layout data to minimize response size.
+     *
+     * @param sessionId The ID of the session.
+     * @return A Mono emitting the ExtendedSessionInfoDTO or empty if not found.
+     */
+    public Mono<ExtendedSessionInfoDTO> getExtendedSessionInfoById(String sessionId) {
+        log.debug("getExtendedSessionInfoById called for sessionId={}", sessionId);
+        return eventReadRepository.findEventBySessionId(sessionId)
+                .mapNotNull(event -> {
+                    EventDocument.SessionInfo sessionInfo = event.getSessions().stream()
+                            .filter(session -> session.getId().equals(sessionId))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (sessionInfo == null) {
+                        return null;
+                    }
+
+                    VenueDetailsDTO venueDetails = null;
+                    if (sessionInfo.getVenueDetails() != null) {
+                        venueDetails = VenueDetailsDTO.builder()
+                                .name(sessionInfo.getVenueDetails().getName())
+                                .address(sessionInfo.getVenueDetails().getAddress())
+                                .onlineLink(sessionInfo.getVenueDetails().getOnlineLink())
+                                .location(sessionInfo.getVenueDetails().getLocation())
+                                .build();
+                    }
+
+                    return ExtendedSessionInfoDTO.builder()
+                            .sessionId(sessionInfo.getId())
+                            .eventId(event.getId())
+                            .eventTitle(event.getTitle())
+                            .startTime(sessionInfo.getStartTime())
+                            .endTime(sessionInfo.getEndTime())
+                            .salesStartTime(sessionInfo.getSalesStartTime())
+                            .status(sessionInfo.getStatus())
+                            .sessionType(sessionInfo.getSessionType())
+                            .venueDetails(venueDetails)
+                            .build();
+                })
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Session", "id", sessionId)));
     }
 }
