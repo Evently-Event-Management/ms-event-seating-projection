@@ -31,7 +31,7 @@ EXPOSE 8082
 # Add the health check instruction, updated for port 8082
 # NOTE: You may need to change the path '/actuator/health' to your actual health endpoint.
 HEALTHCHECK --interval=30s --timeout=10s --retries=5 \
-  CMD curl -f http://localhost:8082/actuator/health || exit 1
+  CMD curl -f http://localhost:8082/api/event-query/health || exit 1
 
 # Set the command to run the application when the container starts
 ENTRYPOINT ["java","-jar","/app/app.jar"]
