@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,13 +36,8 @@ public class SseService {
                 id -> Sinks.many().replay().latest()
         );
 
-        // Heartbeat event every 15 seconds for connection stability
-        Flux<ServerSentEvent<SeatStatusUpdateDto>> heartbeatFlux = Flux.interval(Duration.ofSeconds(15))
-                .map(i -> ServerSentEvent.<SeatStatusUpdateDto>builder()
-                        .comment("keep-alive")
-                        .build());
-
-        return Flux.merge(sink.asFlux(), heartbeatFlux)
+        // Return the basic flux without additional heartbeats
+        return sink.asFlux()
                 .doOnCancel(() -> handleDisconnect(sessionIdStr));
     }
 
