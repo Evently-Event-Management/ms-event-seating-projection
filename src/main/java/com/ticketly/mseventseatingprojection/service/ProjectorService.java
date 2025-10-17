@@ -7,6 +7,7 @@ import com.ticketly.mseventseatingprojection.dto.OrganizationChangePayload;
 import com.ticketly.mseventseatingprojection.exception.NonRetryableProjectionException;
 import com.ticketly.mseventseatingprojection.model.CategoryDocument;
 import com.ticketly.mseventseatingprojection.model.EventDocument;
+import com.ticketly.mseventseatingprojection.model.EventTrendingDocument;
 import com.ticketly.mseventseatingprojection.model.OrganizationDocument;
 import com.ticketly.mseventseatingprojection.repository.*;
 import com.ticketly.mseventseatingprojection.service.mapper.EventProjectionMapper;
@@ -36,6 +37,7 @@ public class ProjectorService {
     private final ObjectMapper objectMapper;
     private final EventProjectionMapper eventProjectionMapper;
     private final SeatingMapMapper seatingMapMapper;
+    private final EventTrendingRepository eventTrendingRepository;
     private final S3UrlGenerator s3UrlGenerator;
 
 
@@ -61,7 +63,31 @@ public class ProjectorService {
      */
     public Mono<Void> deleteEvent(UUID eventId) {
         log.info("Deleting event {} from read model.", eventId);
-        return eventRepository.deleteById(eventId.toString());
+
+        return eventRepository.deleteById(eventId.toString())
+                .then(deleteTrendingData(eventId));
+    }
+    
+    /**
+     * Deletes trending data for the specified event ID.
+     *
+     * @param eventId The UUID of the event.
+     * @return Mono signaling completion.
+     */
+    public Mono<Void> deleteTrendingData(UUID eventId) {
+        log.info("Deleting trending data for event ID: {}", eventId);
+        
+        return eventTrendingRepository.findByEventId(eventId.toString())
+                .flatMap(trendingDoc -> {
+                    log.info("Found and removing trending document for event ID: {}", eventId);
+                    return eventTrendingRepository.delete(trendingDoc);
+                })
+                .then()
+                .doOnSuccess(v -> log.info("Trending data deleted successfully for event ID: {}", eventId))
+                .onErrorResume(e -> {
+                    log.warn("Error deleting trending data for event ID: {}: {}", eventId, e.getMessage());
+                    return Mono.empty();
+                });
     }
 
     /**

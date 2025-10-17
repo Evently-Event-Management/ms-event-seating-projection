@@ -94,10 +94,16 @@ public class DebeziumEventConsumer {
             EventChangePayload eventChange = objectMapper.treeToValue(message.path("after"), EventChangePayload.class);
             log.debug("Event after payload id={} status={}", eventChange.getId(), eventChange.getStatus());
 
-            if ("APPROVED".equals(eventChange.getStatus()) || "COMPLETED".equals(eventChange.getStatus())) {
+            if ("APPROVED".equals(eventChange.getStatus())) {
                 log.info("Projecting full event id={} status={}", eventChange.getId(), eventChange.getStatus());
                 return projectorService.projectFullEvent(eventChange.getId())
                         .doOnSuccess(v -> log.debug("projectFullEvent completed for id: {}", eventChange.getId()))
+                        .onErrorResume(this::handleProjectionError);
+            } else if ("COMPLETED".equals(eventChange.getStatus())) {
+                log.info("Event completed id={}, updating projection and removing trending data", eventChange.getId());
+                return projectorService.projectFullEvent(eventChange.getId())
+                        .then(projectorService.deleteTrendingData(eventChange.getId()))
+                        .doOnSuccess(v -> log.debug("projectFullEvent completed and trending data removed for id: {}", eventChange.getId()))
                         .onErrorResume(this::handleProjectionError);
             } else {
                 log.info("Removing projection for event id={} due to status={}", eventChange.getId(), eventChange.getStatus());
