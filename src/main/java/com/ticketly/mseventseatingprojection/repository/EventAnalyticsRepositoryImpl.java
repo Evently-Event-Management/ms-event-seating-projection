@@ -76,6 +76,38 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
             }
             """);
 
+    private static final AggregationOperation UNIFY_SEATS_OPERATION_FOR_SESSION = context -> Document.parse("""
+            {
+                "$project": {
+                    // Keep necessary fields from the session/event if needed later
+                    "eventId": "$_id",
+                    "sessionInfo": "$$ROOT",
+                    "allSeats": {
+                        "$reduce": {
+                            "input": "$layoutData.layout.blocks", // Path relative to the unwound session document
+                            "initialValue": [],
+                            "in": {
+                                "$concatArrays": [
+                                    "$$value",
+                                    { "$ifNull": ["$$this.seats", []] },
+                                    { "$ifNull": [
+                                        { "$reduce": {
+                                            // ++ FIX: Input should be the rows array itself ++
+                                            "input": "$$this.rows",
+                                            "initialValue": [],
+                                            // ++ FIX: Extract the 'seats' array from each row ('$$this') ++
+                                            "in": { "$concatArrays": ["$$value", "$$this.seats"] }
+                                        }},
+                                        []
+                                    ]}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+            """);
+
     @Override
     public Mono<EventDocument> findEventWithCompleteSeatingData(String eventId) {
         Query query = new Query(Criteria.where("id").is(eventId));
@@ -175,9 +207,9 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         List<AggregationOperation> commonPipeline = createSessionAnalyticsPipeline();
 
         List<AggregationOperation> operations = new ArrayList<>();
-        operations.add(match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)));
+        operations.add(match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)));
         operations.add(unwind("sessions"));
-        operations.add(match(Criteria.where("sessions._id").is(sessionId)));
+        operations.add(match(Criteria.where("sessions.id").is(sessionId)));
         operations.addAll(commonPipeline);
 
         Aggregation aggregation = newAggregation(operations);
@@ -199,23 +231,8 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
     @Override
     public Flux<TierSalesDTO> getTierAnalytics(String eventId) {
-        return getTierAnalyticsInternal(Criteria.where("_id").is(eventId));
-    }
-
-    public Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId) {
-        return getTierAnalyticsInternal(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId));
-    }
-
-    /**
-     * Internal method to handle tier analytics aggregation with different match
-     * criteria
-     *
-     * @param matchCriteria The criteria to use for the initial match operation
-     * @return Flux of TierSalesDTO with tier analytics data
-     */
-    private Flux<TierSalesDTO> getTierAnalyticsInternal(Criteria matchCriteria) {
         Aggregation aggregation = newAggregation(
-                match(matchCriteria),
+                match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
                 // unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
@@ -254,12 +271,51 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         return reactiveMongoTemplate.aggregate(aggregation, "events", TierSalesDTO.class);
     }
 
+    public Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId) {
+        Aggregation aggregation = newAggregation(
+                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
+                unwind("sessions"),
+                UNIFY_SEATS_OPERATION_FOR_SESSION,
+                unwind("allSeats"),
+                replaceRoot("allSeats"),
+                match(Criteria.where("tier.id").ne(null)),
+                group("tier.id")
+                        .first("tier").as("tierData")
+                        .count().as("tierCapacity")
+                        .sum(
+                                ConditionalOperators.when(Criteria.where("status").is("BOOKED")).then(1).otherwise(0))
+                        .as("ticketsSold")
+                        .sum(
+                                ConditionalOperators.when(Criteria.where("status").is("BOOKED"))
+                                        .then(ConvertOperators.Convert.convertValue("$tier.price").to("decimal"))
+                                        .otherwise(0))
+                        .as("totalRevenue"),
+                project()
+                        .and("tierData.id").as("tierId")
+                        .and("tierData.name").as("tierName")
+                        .and("tierData.color").as("tierColor")
+                        .and("tierCapacity").as("tierCapacity")
+                        .and("ticketsSold").as("ticketsSold")
+                        .and("totalRevenue").as("totalRevenue")
+                        .and(
+                                ConditionalOperators.when(Criteria.where("tierCapacity").gt(0))
+                                        .thenValueOf(
+                                                ArithmeticOperators.Multiply.valueOf(
+                                                        ArithmeticOperators.Divide.valueOf("ticketsSold")
+                                                                .divideBy("tierCapacity"))
+                                                        .multiplyBy(100))
+                                        .otherwise(0))
+                        .as("percentageOfTotalSales")
+                        .andExclude("_id"));
+        return reactiveMongoTemplate.aggregate(aggregation, "events", TierSalesDTO.class);
+    }
+
     @Override
     public Flux<SeatStatusCountDTO> getSessionStatusCounts(String eventId, String sessionId) {
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
+                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
                 unwind("sessions"),
-                match(Criteria.where("sessions._id").is(sessionId)),
+                match(Criteria.where("sessions.id").is(sessionId)),
                 // unwind("sessions.layoutData.layout.blocks"),
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
@@ -326,9 +382,9 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 """);
 
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
+                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
                 unwind("sessions"),
-                match(Criteria.where("sessions._id").is(sessionId)),
+                match(Criteria.where("sessions.id").is(sessionId)),
                 unwind("sessions.layoutData.layout.blocks"),
                 unifyBlockSeatsOperation,
                 calculateBlockStatsOperation,
