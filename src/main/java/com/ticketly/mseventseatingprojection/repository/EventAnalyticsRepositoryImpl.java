@@ -76,37 +76,34 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
             }
             """);
 
+    // Simpler version - only projects the unified seats array
     private static final AggregationOperation UNIFY_SEATS_OPERATION_FOR_SESSION = context -> Document.parse("""
-            {
-                "$project": {
-                    // Keep necessary fields from the session/event if needed later
-                    "eventId": "$_id",
-                    "sessionInfo": "$$ROOT",
-                    "allSeats": {
-                        "$reduce": {
-                            "input": "$layoutData.layout.blocks", // Path relative to the unwound session document
-                            "initialValue": [],
-                            "in": {
-                                "$concatArrays": [
-                                    "$$value",
-                                    { "$ifNull": ["$$this.seats", []] },
-                                    { "$ifNull": [
-                                        { "$reduce": {
-                                            // ++ FIX: Input should be the rows array itself ++
-                                            "input": "$$this.rows",
-                                            "initialValue": [],
-                                            // ++ FIX: Extract the 'seats' array from each row ('$$this') ++
-                                            "in": { "$concatArrays": ["$$value", "$$this.seats"] }
-                                        }},
-                                        []
-                                    ]}
-                                ]
-                            }
+        {
+            "$project": {
+                // Project ONLY the unified seats array relative to the unwound session document
+                "allSeats": {
+                    "$reduce": {
+                        "input": "$layoutData.layout.blocks", // Path relative to the session document
+                        "initialValue": [],
+                        "in": {
+                            "$concatArrays": [
+                                "$$value",
+                                { "$ifNull": ["$$this.seats", []] },
+                                { "$ifNull": [
+                                    { "$reduce": {
+                                        "input": "$$this.rows", // Iterate rows array
+                                        "initialValue": [],
+                                        "in": { "$concatArrays": ["$$value", { "$ifNull": ["$$this.seats", []] }] } // Extract seats safely
+                                    }},
+                                    []
+                                ]}
+                            ]
                         }
                     }
                 }
             }
-            """);
+        }
+        """);
 
     @Override
     public Mono<EventDocument> findEventWithCompleteSeatingData(String eventId) {
@@ -276,23 +273,35 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
 
     public Flux<TierSalesDTO> getTierAnalytics(String eventId, String sessionId) {
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
+                // 1. Match the specific event containing the session
+                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
+                // 2. Unwind sessions
                 unwind("sessions"),
-                UNIFY_SEATS_OPERATION_FOR_SESSION,
+                // 3. Match ONLY the specific session document AFTER unwinding
+                match(Criteria.where("sessions._id").is(sessionId)),
+                // 4. Unify seats for this session (adds 'allSeats' field to the current doc)
+                UNIFY_SEATS_OPERATION,
+                // 5. Unwind the unified seats array
                 unwind("allSeats"),
-                replaceRoot("allSeats"),
-                match(Criteria.where("tier._id").ne(null)),
-                group("tier._id")
-                        .first("tier").as("tierData")
+                // 6. Filter for seats with COMPLETE tier info
+                match(
+                        Criteria.where("allSeats.tier").exists(true)
+                                .and("allSeats.tier._id").ne(null)
+                                .and("allSeats.tier.name").ne(null) // Assuming name is reliable for grouping
+                                .and("allSeats.tier.price").ne(null)
+                ),
+                // 7. Group by tier ID (Data is now at 'allSeats.tier')
+                group("allSeats.tier._id")
+                        .first("allSeats.tier").as("tierData") // Grab tier info from the seat
                         .count().as("tierCapacity")
                         .sum(
-                                ConditionalOperators.when(Criteria.where("status").is("BOOKED")).then(1).otherwise(0))
-                        .as("ticketsSold")
+                                ConditionalOperators.when(Criteria.where("allSeats.status").is("BOOKED")).then(1).otherwise(0)
+                        ).as("ticketsSold")
                         .sum(
-                                ConditionalOperators.when(Criteria.where("status").is("BOOKED"))
-                                        .then(ConvertOperators.Convert.convertValue("$tier.price").to("decimal"))
-                                        .otherwise(0))
-                        .as("totalRevenue"),
+                                ConditionalOperators.when(Criteria.where("allSeats.status").is("BOOKED"))
+                                        .then(ConvertOperators.Convert.convertValue("$allSeats.tier.price").to("decimal"))
+                                        .otherwise(0)
+                        ).as("totalRevenue"),
                 project()
                         .and("tierData._id").as("tierId")
                         .and("tierData.name").as("tierName")
