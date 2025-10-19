@@ -76,35 +76,6 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
             }
             """);
 
-    // Simpler version - only projects the unified seats array
-    private static final AggregationOperation UNIFY_SEATS_OPERATION_FOR_SESSION = context -> Document.parse("""
-        {
-            "$project": {
-                // Project ONLY the unified seats array relative to the unwound session document
-                "allSeats": {
-                    "$reduce": {
-                        "input": "$layoutData.layout.blocks", // Path relative to the session document
-                        "initialValue": [],
-                        "in": {
-                            "$concatArrays": [
-                                "$$value",
-                                { "$ifNull": ["$$this.seats", []] },
-                                { "$ifNull": [
-                                    { "$reduce": {
-                                        "input": "$$this.rows", // Iterate rows array
-                                        "initialValue": [],
-                                        "in": { "$concatArrays": ["$$value", { "$ifNull": ["$$this.seats", []] }] } // Extract seats safely
-                                    }},
-                                    []
-                                ]}
-                            ]
-                        }
-                    }
-                }
-            }
-        }
-        """);
-
     @Override
     public Mono<EventDocument> findEventWithCompleteSeatingData(String eventId) {
         Query query = new Query(Criteria.where("id").is(eventId));
