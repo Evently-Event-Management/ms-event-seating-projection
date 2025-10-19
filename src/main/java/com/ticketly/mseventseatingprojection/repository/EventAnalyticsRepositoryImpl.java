@@ -278,8 +278,8 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 UNIFY_SEATS_OPERATION_FOR_SESSION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
-                match(Criteria.where("tier.id").ne(null)),
-                group("tier.id")
+                match(Criteria.where("tier._id").ne(null)),
+                group("tier._id")
                         .first("tier").as("tierData")
                         .count().as("tierCapacity")
                         .sum(
@@ -291,7 +291,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                                         .otherwise(0))
                         .as("totalRevenue"),
                 project()
-                        .and("tierData.id").as("tierId")
+                        .and("tierData._id").as("tierId")
                         .and("tierData.name").as("tierName")
                         .and("tierData.color").as("tierColor")
                         .and("tierCapacity").as("tierCapacity")
