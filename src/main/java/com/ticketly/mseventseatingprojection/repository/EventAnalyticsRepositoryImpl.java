@@ -118,7 +118,8 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     public Mono<EventDocument> findSessionWithCompleteSeatingData(String eventId, String sessionId) {
         Query query = new Query(
                 Criteria.where("id").is(eventId)
-                        .and("sessions.id").is(sessionId));
+                        .and("sessions.id").is(sessionId)
+        );
         return reactiveMongoTemplate.findOne(query, EventDocument.class);
     }
 
@@ -175,13 +176,14 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         Aggregation aggregation = newAggregation(
                 match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
-                // unwind("sessions.layoutData.layout.blocks"),
+//                unwind("sessions.layoutData.layout.blocks"),
                 // ++ USE THE NATIVE OPERATION HERE ++
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
                 calculateStatsOperation,
-                calculateDerivedMetrics);
+                calculateDerivedMetrics
+        );
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", EventOverallStatsDTO.class)
                 .next()
@@ -207,9 +209,9 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
         List<AggregationOperation> commonPipeline = createSessionAnalyticsPipeline();
 
         List<AggregationOperation> operations = new ArrayList<>();
-        operations.add(match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)));
+        operations.add(match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)));
         operations.add(unwind("sessions"));
-        operations.add(match(Criteria.where("sessions.id").is(sessionId)));
+        operations.add(match(Criteria.where("sessions._id").is(sessionId)));
         operations.addAll(commonPipeline);
 
         Aggregation aggregation = newAggregation(operations);
@@ -225,7 +227,8 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 match(Criteria.where("_id").is(eventId)),
                 unwind("sessions"),
                 group("sessions.status").count().as("count"),
-                project("count").and("_id").as("status").andExclude("_id"));
+                project("count").and("_id").as("status").andExclude("_id")
+        );
         return reactiveMongoTemplate.aggregate(aggregation, "events", SessionStatusCountDTO.class);
     }
 
@@ -313,15 +316,15 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
     @Override
     public Flux<SeatStatusCountDTO> getSessionStatusCounts(String eventId, String sessionId) {
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
+                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
-                match(Criteria.where("sessions.id").is(sessionId)),
-                // unwind("sessions.layoutData.layout.blocks"),
+                match(Criteria.where("sessions._id").is(sessionId)),
                 UNIFY_SEATS_OPERATION,
                 unwind("allSeats"),
                 replaceRoot("allSeats"),
                 group("status").count().as("count"),
-                project("count").and("_id").as("status").andExclude("_id"));
+                project("count").and("_id").as("status").andExclude("_id")
+        );
         return reactiveMongoTemplate.aggregate(aggregation, "events", SeatStatusCountDTO.class);
     }
 
@@ -351,15 +354,14 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 }
                 """);
 
-        AggregationOperation calculateBlockStatsOperation = context -> Document
-                .parse("""
-                        {
-                            "$addFields": {
-                                "blockCapacity": {"$size": "$allSeatsInBlock"},
-                                "seatsSold": {"$size": {"$filter": {"input": "$allSeatsInBlock", "as": "seat", "cond": {"$eq": ["$$seat.status", "BOOKED"]}}}}
-                            }
-                        }
-                        """);
+        AggregationOperation calculateBlockStatsOperation = context -> Document.parse("""
+                {
+                    "$addFields": {
+                        "blockCapacity": {"$size": "$allSeatsInBlock"},
+                        "seatsSold": {"$size": {"$filter": {"input": "$allSeatsInBlock", "as": "seat", "cond": {"$eq": ["$$seat.status", "BOOKED"]}}}}
+                    }
+                }
+                """);
 
         AggregationOperation projectBlockOccupancyOperation = context -> Document.parse("""
                 {
@@ -382,13 +384,14 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 """);
 
         Aggregation aggregation = newAggregation(
-                match(Criteria.where("_id").is(eventId).and("sessions.id").is(sessionId)),
+                match(Criteria.where("_id").is(eventId).and("sessions._id").is(sessionId)),
                 unwind("sessions"),
-                match(Criteria.where("sessions.id").is(sessionId)),
+                match(Criteria.where("sessions._id").is(sessionId)),
                 unwind("sessions.layoutData.layout.blocks"),
                 unifyBlockSeatsOperation,
                 calculateBlockStatsOperation,
-                projectBlockOccupancyOperation);
+                projectBlockOccupancyOperation
+        );
 
         return reactiveMongoTemplate.aggregate(aggregation, "events", BlockOccupancyDTO.class);
     }
@@ -400,42 +403,39 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
      */
     private List<AggregationOperation> createSessionAnalyticsPipeline() {
         // Define the complex stages using native JSON for clarity and correctness
-        AggregationOperation unifySeatsOperation = context -> Document
-                .parse("""
-                            {
-                                "$addFields": {
-                                    "unifiedSeats": {
-                                        "$reduce": {
-                                            "input": "$sessions.layoutData.layout.blocks",
-                                            "initialValue": [],
-                                            "in": { "$concatArrays": [ "$$value", { "$ifNull": ["$$this.seats", []] }, { "$ifNull": [ { "$reduce": { "input": "$$this.rows.seats", "initialValue": [], "in": { "$concatArrays": ["$$value", "$$this"] }}}, [] ]} ] }
-                                        }
-                                    }
+        AggregationOperation unifySeatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "unifiedSeats": {
+                                "$reduce": {
+                                    "input": "$sessions.layoutData.layout.blocks",
+                                    "initialValue": [],
+                                    "in": { "$concatArrays": [ "$$value", { "$ifNull": ["$$this.seats", []] }, { "$ifNull": [ { "$reduce": { "input": "$$this.rows.seats", "initialValue": [], "in": { "$concatArrays": ["$$value", "$$this"] }}}, [] ]} ] }
                                 }
                             }
-                        """);
+                        }
+                    }
+                """);
 
-        AggregationOperation calculateStatsOperation = context -> Document
-                .parse("""
-                            {
-                                "$addFields": {
-                                    "sessionCapacity": { "$size": "$unifiedSeats" },
-                                    "bookedSeats": {
-                                        "$filter": { "input": "$unifiedSeats", "as": "seat", "cond": { "$eq": ["$$seat.status", "BOOKED"] } }
-                                    }
-                                }
+        AggregationOperation calculateStatsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "sessionCapacity": { "$size": "$unifiedSeats" },
+                            "bookedSeats": {
+                                "$filter": { "input": "$unifiedSeats", "as": "seat", "cond": { "$eq": ["$$seat.status", "BOOKED"] } }
                             }
-                        """);
+                        }
+                    }
+                """);
 
-        AggregationOperation calculateFinalMetricsOperation = context -> Document
-                .parse("""
-                            {
-                                "$addFields": {
-                                    "ticketsSold": { "$size": "$bookedSeats" },
-                                    "sessionRevenue": { "$sum": { "$map": { "input": "$bookedSeats", "as": "seat", "in": { "$toDecimal": "$$seat.tier.price" } } } }
-                                }
-                            }
-                        """);
+        AggregationOperation calculateFinalMetricsOperation = context -> Document.parse("""
+                    {
+                        "$addFields": {
+                            "ticketsSold": { "$size": "$bookedSeats" },
+                            "sessionRevenue": { "$sum": { "$map": { "input": "$bookedSeats", "as": "seat", "in": { "$toDecimal": "$$seat.tier.price" } } } }
+                        }
+                    }
+                """);
 
         // Add the sellOutPercentage directly as a Document stage
         AggregationOperation calculateSellOutPercentage = context -> Document.parse("""
@@ -476,6 +476,7 @@ public class EventAnalyticsRepositoryImpl implements EventAnalyticsRepository {
                 calculateStatsOperation,
                 calculateFinalMetricsOperation,
                 calculateSellOutPercentage,
-                finalProjection);
+                finalProjection
+        );
     }
 }

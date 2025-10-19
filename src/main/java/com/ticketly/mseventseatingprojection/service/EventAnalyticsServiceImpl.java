@@ -128,7 +128,10 @@ public class EventAnalyticsServiceImpl implements EventAnalyticsService {
         // Combine all results to build the final DTO
         return Mono.zip(
                         sessionSummaryMono,
-                        tierAnalyticsFlux.collectList(),
+                        tierAnalyticsFlux.collectList().doOnSuccess(tierSalesDTO -> {
+                            //Log the obtained tier analytics
+                            log.debug("Obtained {} tier analytics entries for sessionId={}", tierSalesDTO.size(), sessionId);
+                        }),
                         seatStatusCountsFlux.collectMap(SeatStatusCountDTO::getStatus, SeatStatusCountDTO::getCount),
                         blockOccupancyFlux.collectList()
                 )
