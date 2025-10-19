@@ -27,47 +27,44 @@ public class TrendingRepositoryCustomImpl implements TrendingRepositoryCustom {
     public Flux<EventDocument> findTopTrendingEvents(int limit) {
         List<AggregationOperation> pipeline = new ArrayList<>();
 
-        // Stage 1: Lookup trending scores - The event document has 'id' field and trending document has 'eventId' field
+        // Stage 1: Lookup trending scores
         log.info("Setting up lookup from events(id) to event_trending_scores(eventId)");
-        LookupOperation lookupTrending = lookup("event_trending_scores", "id", "eventId", "trendingInfo");
+        LookupOperation lookupTrending = lookup("event_trending_scores", "_id", "eventId", "trendingInfo");
         pipeline.add(lookupTrending);
 
-        // Stage 2: Match only events that have trending info - remove status filter for debugging
-        pipeline.add(match(Criteria.where("trendingInfo").ne(null)));
+        // Stage 2: Unwind and Filter (THE FIX)
+        // By *NOT* passing 'true', this stage now correctly deconstructs the array
+        // AND automatically filters out any events that had no match 
+        // (i.e., 'trendingInfo' was []). This removes "Neon Music".
+        pipeline.add(unwind("trendingInfo"));
 
-        // Stage 3: Unwind trending info array to get single document per event
-        // Use preserveNullAndEmptyArrays:true to handle events that might not have trending info
-        pipeline.add(unwind("trendingInfo", true));
-
-        // Stage 4: Sort by trending score (descending)
+        // Stage 3: Sort by trending score (descending)
+        // This will now work correctly as all remaining documents 
+        // have a 'trendingInfo.trendingScore' field.
         pipeline.add(sort(Sort.Direction.DESC, "trendingInfo.trendingScore"));
 
-        // Stage 5: Limit results
+        // Stage 4: Limit results
         pipeline.add(limit(limit));
-        
-        // Stage 6: Project to exclude layout data which is large
+
+        // Stage 5: Project to the final shape (This was your correct Stage 6)
+        // The redundant Stage 7 is removed.
         pipeline.add(project()
                 .andInclude("id", "title", "description", "overview", "coverPhotos", "organization", "category", "tiers")
                 .and("sessions").as("sessions")
                 .and("discounts").as("discounts")
                 .and("trendingInfo.trendingScore").as("trendingScore")
                 .and("trendingInfo.viewCount").as("viewCount"));
-        
-        // Stage 7: Use a different approach to filter out layout data
-        // Since Spring Data MongoDB doesn't directly support excluding nested fields in projections,
-        // we'll use a conditional to reshape the sessions array
-        pipeline.add(project()
-                .andInclude("id", "title", "description", "overview", "coverPhotos", "organization", "category", "tiers", "discounts", "trendingScore", "viewCount")
-                .and("sessions").as("sessions"));
 
-        log.info("Executing trending events aggregation with limit={}", limit);
+        log.info("Executing corrected trending events aggregation with limit={}", limit);
         return reactiveMongoTemplate.aggregate(
-                Aggregation.newAggregation(pipeline),
-                "events",
-                EventDocument.class
-        )
-        .doOnNext(event -> log.info("Found trending event: id={}, title={}", event.getId(), event.getTitle()))
-        .doOnComplete(() -> log.info("Trending events aggregation completed"))
-        .doOnError(e -> log.error("Error in trending events aggregation: {}", e.getMessage()));
+                        Aggregation.newAggregation(pipeline),
+                        "events",
+                        EventDocument.class // Assumes EventDocument has fields for trendingScore/viewCount
+                )
+                .doOnNext(event -> log.info("Found trending event: id={}, title={}",
+                        event.getId(),
+                        event.getTitle()))
+                .doOnComplete(() -> log.info("Trending events aggregation completed"))
+                .doOnError(e -> log.error("Error in trending events aggregation: {}", e.getMessage()));
     }
 }
