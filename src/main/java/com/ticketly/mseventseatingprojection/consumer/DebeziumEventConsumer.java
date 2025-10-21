@@ -13,13 +13,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import model.SessionStatus;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.cache.CacheManager;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.Objects;
 import java.util.UUID;
+
+import static com.ticketly.mseventseatingprojection.config.CacheConfig.SESSION_COUNT_CACHE;
+import static com.ticketly.mseventseatingprojection.config.CacheConfig.TRENDING_EVENTS_CACHE;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ public class DebeziumEventConsumer {
     private final EventRepository eventReadRepository;
     private final ObjectMapper objectMapper;
     private final EventReadRepositoryCustom eventReadRepositoryCustom;
+    private final CacheManager cacheManager;
 
     @KafkaListener(topics = {
             "dbz.ticketly.public.events",
@@ -86,6 +92,8 @@ public class DebeziumEventConsumer {
             if ("d".equals(operation)) {
                 UUID eventId = UUID.fromString(message.path("before").path("id").asText());
                 log.info("Event delete detected for id: {}. Deleting projection.", eventId);
+                evictTrendingCache();
+                evictSessionCountCache();
                 return projectorService.deleteEvent(eventId)
                         .doOnSuccess(v -> log.debug("deleteEvent completed for id: {}", eventId))
                         .onErrorResume(this::handleProjectionError);
@@ -96,17 +104,23 @@ public class DebeziumEventConsumer {
 
             if ("APPROVED".equals(eventChange.getStatus())) {
                 log.info("Projecting full event id={} status={}", eventChange.getId(), eventChange.getStatus());
+                evictTrendingCache();
+                evictSessionCountCache();
                 return projectorService.projectFullEvent(eventChange.getId())
                         .doOnSuccess(v -> log.debug("projectFullEvent completed for id: {}", eventChange.getId()))
                         .onErrorResume(this::handleProjectionError);
             } else if ("COMPLETED".equals(eventChange.getStatus())) {
                 log.info("Event completed id={}, updating projection and removing trending data", eventChange.getId());
+                evictTrendingCache();
+                evictSessionCountCache();
                 return projectorService.projectFullEvent(eventChange.getId())
                         .then(projectorService.deleteTrendingData(eventChange.getId()))
                         .doOnSuccess(v -> log.debug("projectFullEvent completed and trending data removed for id: {}", eventChange.getId()))
                         .onErrorResume(this::handleProjectionError);
             } else {
                 log.info("Removing projection for event id={} due to status={}", eventChange.getId(), eventChange.getStatus());
+                evictTrendingCache();
+                evictSessionCountCache();
                 return projectorService.deleteEvent(eventChange.getId())
                         .doOnSuccess(v -> log.debug("deleteEvent completed for id: {}", eventChange.getId()))
                         .onErrorResume(this::handleProjectionError);
@@ -126,6 +140,8 @@ public class DebeziumEventConsumer {
             if ("d".equals(operation)) {
                 SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("before"), SessionChangePayload.class);
                 log.debug("Session delete detected for eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+                evictSessionCountCache();
+                evictTrendingCache();
 
                 return eventReadRepository.existsById(sessionChange.getEventId().toString())
                     .flatMap(exists -> {
@@ -144,6 +160,8 @@ public class DebeziumEventConsumer {
 
             SessionChangePayload sessionChange = objectMapper.treeToValue(message.path("after"), SessionChangePayload.class);
             log.debug("SessionChange payload eventId={} sessionId={}", sessionChange.getEventId(), sessionChange.getId());
+            evictSessionCountCache();
+            evictTrendingCache();
 
             return eventReadRepository.existsById(sessionChange.getEventId().toString())
                     .flatMap(exists -> {
@@ -399,5 +417,35 @@ public class DebeziumEventConsumer {
             return Mono.empty();
         }
         return Mono.error(error);
+    }
+
+    /**
+     * Evicts the trending events cache.
+     * Called when events or sessions are modified to ensure fresh trending data.
+     */
+    private void evictTrendingCache() {
+        try {
+            if (cacheManager.getCache(TRENDING_EVENTS_CACHE) != null) {
+                Objects.requireNonNull(cacheManager.getCache(TRENDING_EVENTS_CACHE)).clear();
+                log.info("Evicted trending events cache due to event/session change");
+            }
+        } catch (Exception e) {
+            log.error("Error evicting trending cache: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Evicts the session count cache.
+     * Called when events or sessions are modified to ensure accurate counts.
+     */
+    private void evictSessionCountCache() {
+        try {
+            if (cacheManager.getCache(SESSION_COUNT_CACHE) != null) {
+                Objects.requireNonNull(cacheManager.getCache(SESSION_COUNT_CACHE)).clear();
+                log.info("Evicted session count cache due to event/session change");
+            }
+        } catch (Exception e) {
+            log.error("Error evicting session count cache: {}", e.getMessage());
+        }
     }
 }

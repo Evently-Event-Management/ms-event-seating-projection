@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import model.EventStatus;
 import model.SessionStatus;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -247,18 +248,21 @@ public class EventQueryService {
 
     /**
      * Counts the total number of sessions across all events in the database.
+     * This method is cached to avoid repeated database queries.
      *
      * @return Mono emitting SessionCountDTO containing the total count of sessions.
      */
+    @Cacheable(value = "sessionCount", key = "'total'")
     public Mono<SessionCountDTO> countAllSessions() {
-        log.debug("countAllSessions called");
+        log.info("countAllSessions called - fetching from database (cache miss)");
         return eventReadRepository.countAllSessions()
                 .map(count -> {
                     log.info("Total number of sessions in database: {}", count);
                     return SessionCountDTO.builder()
                             .totalSessions(count)
                             .build();
-                });
+                })
+                .cache(); // Cache the Mono result
     }
 
     public Mono<PreOrderValidationResponse> validatePreOrderDetails(CreateOrderRequest request) {

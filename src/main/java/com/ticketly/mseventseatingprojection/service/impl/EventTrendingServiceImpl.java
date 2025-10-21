@@ -12,6 +12,7 @@ import com.ticketly.mseventseatingprojection.service.GoogleAnalyticsService;
 import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -117,14 +118,16 @@ public class EventTrendingServiceImpl implements EventTrendingService {
     }
     
     @Override
+    @Cacheable(value = "trendingEvents", key = "#limit")
     public Flux<EventThumbnailDTO> getTopTrendingEventThumbnails(int limit) {
-        log.info("Getting top {} trending event thumbnails", limit);
+        log.info("Getting top {} trending event thumbnails from database (cache miss)", limit);
         return trendingRepositoryCustom.findTopTrendingEvents(limit)
-                .doOnNext(event -> log.info("Processing event from repository: id={}, title={}", event.getId(), event.getTitle()))
+                .doOnNext(event -> log.debug("Processing event from repository: id={}, title={}", event.getId(), event.getTitle()))
                 .map(eventMapper::mapToThumbnailDTO)
-                .doOnNext(dto -> log.info("Mapped trending event to thumbnail: id={}, title={}", dto.getId(), dto.getTitle()))
+                .doOnNext(dto -> log.debug("Mapped trending event to thumbnail: id={}, title={}", dto.getId(), dto.getTitle()))
                 .doOnComplete(() -> log.info("Completed getting trending event thumbnails"))
-                .doOnError(e -> log.error("Error getting trending event thumbnails: {}", e.getMessage()));
+                .doOnError(e -> log.error("Error getting trending event thumbnails: {}", e.getMessage()))
+                .cache(); // Cache the Flux result
     }
     
     /**

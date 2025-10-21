@@ -7,10 +7,24 @@ spring:
 
   webflux:
     base-path: /api/event-query
+  
+  # Redis Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600s
+      key-prefix: "event-seating-projection-ms::"
+  
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/event-seating}
       auto-index-creation: true
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: ${REDIS_TIMEOUT:2000}
+      repositories:
+        enabled: false
 
   kafka:
     consumer:
