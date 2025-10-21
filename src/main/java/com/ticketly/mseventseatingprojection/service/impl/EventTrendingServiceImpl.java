@@ -12,12 +12,16 @@ import com.ticketly.mseventseatingprojection.service.GoogleAnalyticsService;
 import com.ticketly.mseventseatingprojection.service.mapper.EventQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.Objects;
+
+import static com.ticketly.mseventseatingprojection.config.CacheConfig.TRENDING_EVENTS_CACHE;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,8 @@ public class EventTrendingServiceImpl implements EventTrendingService {
     private final GoogleAnalyticsService googleAnalyticsService;
     private final TrendingRepositoryCustom trendingRepositoryCustom;
     private final EventQueryMapper eventMapper;
+    private final CacheManager cacheManager;
+
 
     @Override
     public Mono<EventTrendingDocument> getEventTrendingScore(String eventId) {
@@ -107,7 +113,12 @@ public class EventTrendingServiceImpl implements EventTrendingService {
                             log.error("Error calculating trending score for eventId={}: {}", 
                                     event.getId(), e.getMessage());
                             return Mono.empty();
-                        }));
+                        }))
+                .doOnComplete(() -> {
+                    evictTrendingCache();
+                    log.info("Completed calculating all trending scores and evicted cache");
+                })
+                .doOnError(e -> log.error("Error during trending score calculation: {}", e.getMessage()));
     }
 
     @Override
@@ -151,5 +162,19 @@ public class EventTrendingServiceImpl implements EventTrendingService {
         return (viewWeight * views +
                         purchaseWeight * purchases +
                         selloutPercentageWeight * selloutPercentage);
+    }
+
+    /**
+     * Evicts the trending events cache after recalculation
+     */
+    private void evictTrendingCache() {
+        try {
+            if (cacheManager.getCache(TRENDING_EVENTS_CACHE) != null) {
+                Objects.requireNonNull(cacheManager.getCache(TRENDING_EVENTS_CACHE)).clear();
+                log.info("Evicted trending events cache after score recalculation");
+            }
+        } catch (Exception e) {
+            log.error("Error evicting trending cache: {}", e.getMessage());
+        }
     }
 }
